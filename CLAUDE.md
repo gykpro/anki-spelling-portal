@@ -7,7 +7,7 @@ Follow this order for every feature request or change:
 1. **Plan first** — Enter plan mode, explore the codebase, and write an implementation plan for user approval before writing code.
 2. **Implement** — Write the code following the approved plan.
 3. **Update tests** — If the change affects UI behavior, update `tests/ui-test-plan.md` to reflect new or modified scenarios. Add new sections for new features, revise existing steps for changed behavior, remove obsolete cases.
-4. **Self-test** — Run the relevant sections of the UI test plan via browser automation. Report results in a table. Fix any failures before proceeding.
+4. **Self-test** — Always run the UI test plan sections related to the new/changed features via browser automation. This is mandatory, not optional. Report results in a table. Fix any failures before proceeding.
 5. **Commit** — After tests pass, create a git commit with a descriptive message summarizing the change.
 
 ## When to Commit
