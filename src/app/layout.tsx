@@ -6,6 +6,7 @@ import {
   Upload,
   Library,
   Sparkles,
+  PenLine,
 } from "lucide-react";
 
 export const metadata: Metadata = {
@@ -16,6 +17,7 @@ export const metadata: Metadata = {
 const navItems = [
   { href: "/", label: "Dashboard", icon: Home },
   { href: "/upload", label: "Upload", icon: Upload },
+  { href: "/quick-add", label: "Quick Add", icon: PenLine },
   { href: "/browse", label: "Browse", icon: Library },
   { href: "/enrich", label: "Enrich", icon: Sparkles },
 ];

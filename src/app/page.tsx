@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Upload, Library, Sparkles } from "lucide-react";
+import { Upload, Library, Sparkles, PenLine } from "lucide-react";
 import { useAnkiConnection } from "@/hooks/useAnkiConnection";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
@@ -72,7 +72,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Quick Actions */}
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Link
           href="/upload"
           className="group rounded-lg border border-border p-5 transition-colors hover:border-primary/50 hover:bg-accent"
@@ -81,6 +81,16 @@ export default function DashboardPage() {
           <h3 className="mt-3 text-sm font-semibold">Upload & Extract</h3>
           <p className="mt-1 text-xs text-muted-foreground">
             Upload spelling worksheets and extract sentences
+          </p>
+        </Link>
+        <Link
+          href="/quick-add"
+          className="group rounded-lg border border-border p-5 transition-colors hover:border-primary/50 hover:bg-accent"
+        >
+          <PenLine className="h-8 w-8 text-primary" />
+          <h3 className="mt-3 text-sm font-semibold">Quick Add</h3>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Add words and generate cards with enrichment
           </p>
         </Link>
         <Link
