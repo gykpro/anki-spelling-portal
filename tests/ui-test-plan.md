@@ -99,17 +99,17 @@ Pre-requisites: Anki running with AnkiConnect, dev server on localhost:3000.
 ### 4a. Navigate with test cards
 - Find the test note IDs for `__test_apple`, `__test_banana`, `__test_cherry` via AnkiConnect API
 - Navigate to `/enrich?noteIds=<ids>`
-- Verify 3 cards loaded, all showing "5 missing"
+- Verify 3 cards loaded, all showing "6 missing"
 
 ### 4b. Expand and inspect
 - Click a test card to expand
-- Verify 6 field boxes shown (Sentence, Definition, Phonetic, Synonyms, Extra Examples, Image)
-- Verify Image shows "Needs sentence" and is grayed out
+- Verify 8 field boxes shown (Sentence, Definition, Phonetic, Synonyms, Extra Examples, Image, Word Audio, Sentence Audio)
+- Verify Image and Sentence Audio show "Needs sentence" and are grayed out
 - Verify "Select all empty" button present
 
 ### 4c. Generate text fields (critical — tests Claude CLI)
 - On `__test_apple`, click "Select all empty"
-- Verify 5 fields selected (not Image)
+- Verify 6 fields selected (not Image or Sentence Audio)
 - Click "Generate", verify spinner appears
 - Wait for results (up to 60s)
 - Verify generated results preview shows: Sentence, Definition, Phonetic, Synonyms, Extra
@@ -117,7 +117,7 @@ Pre-requisites: Anki running with AnkiConnect, dev server on localhost:3000.
 
 ### 4d. Save to Anki
 - Click "Save to Anki"
-- Verify page refreshes, card now shows sentence and "1 missing" (only image)
+- Verify page refreshes, card now shows sentence and "2 missing" (Image + Sentence Audio)
 
 ### 4e. Image generation (requires sentence)
 - Expand the saved card again
@@ -141,6 +141,27 @@ Pre-requisites: Anki running with AnkiConnect, dev server on localhost:3000.
 ### 4h. Generate with no fields selected
 - Expand a card, don't select any fields
 - Verify Generate button is disabled
+
+### 4i. Generate word audio
+- On a test card that already has a Word value, expand the card
+- Select only "Word Audio"
+- Click Generate, verify spinner appears
+- Wait for result (up to 15s — Azure TTS is fast)
+- Verify audio player appears in results preview with play button
+- Click play, verify audio plays (word pronunciation)
+- Click "Save to Anki"
+- Verify card refreshes, "Word Audio" field now shows "Has audio"
+- In Anki, verify the Audio field contains `[sound:spelling_<word>_<noteId>.mp3]`
+
+### 4j. Generate sentence audio (requires sentence)
+- On a test card that already has a Main Sentence, expand the card
+- Verify "Sentence Audio" button is available (not grayed out)
+- Select only "Sentence Audio"
+- Click Generate, wait for result
+- Verify audio player appears in results preview
+- Click play, verify audio plays (full sentence)
+- Save to Anki, verify "Sentence Audio" shows "Has audio"
+- On a card WITHOUT a sentence, verify "Sentence Audio" shows "Needs sentence" and is unavailable
 
 ---
 

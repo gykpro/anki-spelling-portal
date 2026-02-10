@@ -7,7 +7,9 @@ export type EnrichField =
   | "phonetic"
   | "synonyms"
   | "extra_info"
-  | "image";
+  | "image"
+  | "audio"
+  | "sentence_audio";
 
 interface EnrichRequest {
   noteId: number;
@@ -64,6 +66,57 @@ Important:
 - For definitions of phrases, explain the idiomatic meaning`;
 }
 
+function stripHtmlServer(html: string): string {
+  return html.replace(/<[^>]*>/g, "");
+}
+
+function escapeXml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
+async function generateTTS(
+  text: string,
+  type: "word" | "sentence"
+): Promise<{ base64: string; format: string }> {
+  const key = process.env.AZURE_TTS_KEY;
+  const region = process.env.AZURE_TTS_REGION;
+  if (!key || !region) throw new Error("Azure TTS credentials not configured");
+
+  const rate = type === "word" ? "-10%" : "0%";
+  const ssml = `<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='en-US'>
+  <voice name='en-US-AnaNeural'>
+    <prosody rate='${rate}'>${escapeXml(text)}</prosody>
+  </voice>
+</speak>`;
+
+  const res = await fetch(
+    `https://${region}.tts.speech.microsoft.com/cognitiveservices/v1`,
+    {
+      method: "POST",
+      headers: {
+        "Ocp-Apim-Subscription-Key": key,
+        "Content-Type": "application/ssml+xml",
+        "X-Microsoft-OutputFormat": "audio-16khz-128kbitrate-mono-mp3",
+      },
+      body: ssml,
+    }
+  );
+
+  if (!res.ok) {
+    const errBody = await res.text();
+    throw new Error(`Azure TTS error ${res.status}: ${errBody}`);
+  }
+
+  const arrayBuffer = await res.arrayBuffer();
+  const base64 = Buffer.from(arrayBuffer).toString("base64");
+  return { base64, format: "mp3" };
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body: EnrichRequest = await request.json();
@@ -76,8 +129,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const textFields = fields.filter((f) => f !== "image");
+    const nonTextFields = new Set(["image", "audio", "sentence_audio"]);
+    const textFields = fields.filter((f) => !nonTextFields.has(f));
     const needsImage = fields.includes("image");
+    const needsAudio = fields.includes("audio");
+    const needsSentenceAudio = fields.includes("sentence_audio");
 
     const results: Record<string, unknown> = { noteId, word };
 
@@ -104,6 +160,40 @@ export async function POST(request: NextRequest) {
             err instanceof Error ? err.message : "Image generation failed";
         }
       }
+    }
+
+    // Generate audio via Azure TTS (parallel when both requested)
+    const audioPromises: Promise<void>[] = [];
+
+    if (needsAudio) {
+      audioPromises.push(
+        generateTTS(word, "word")
+          .then((tts) => { results.audio = tts; })
+          .catch((err) => {
+            results.audio_error =
+              err instanceof Error ? err.message : "Audio generation failed";
+          })
+      );
+    }
+
+    if (needsSentenceAudio) {
+      const ttsText = sentence || (results.sentence as string);
+      if (!ttsText) {
+        results.sentence_audio_error = "Sentence required for sentence audio";
+      } else {
+        audioPromises.push(
+          generateTTS(stripHtmlServer(ttsText), "sentence")
+            .then((tts) => { results.sentence_audio = tts; })
+            .catch((err) => {
+              results.sentence_audio_error =
+                err instanceof Error ? err.message : "Sentence audio generation failed";
+            })
+        );
+      }
+    }
+
+    if (audioPromises.length > 0) {
+      await Promise.all(audioPromises);
     }
 
     return NextResponse.json(results);

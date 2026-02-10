@@ -8,11 +8,9 @@ export interface DefinitionResult {
 
 export interface TTSResult {
   /** Base64-encoded audio data */
-  audioBase64: string;
+  base64: string;
   /** Audio format (e.g., "mp3") */
   format: string;
-  /** Generated filename */
-  filename: string;
 }
 
 export interface ImageGenResult {

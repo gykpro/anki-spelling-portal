@@ -14,6 +14,7 @@ import {
   ChevronDown,
   ChevronRight,
   Save,
+  Volume2,
 } from "lucide-react";
 
 function getFieldValue(note: AnkiNote, field: string): string {
@@ -22,6 +23,18 @@ function getFieldValue(note: AnkiNote, field: string): string {
 
 function stripHtml(html: string): string {
   return html.replace(/<[^>]*>/g, "");
+}
+
+function AudioPreview({ base64, label }: { base64: string; label: string }) {
+  return (
+    <div className="flex items-center gap-2">
+      <Volume2 className="h-3.5 w-3.5 text-success shrink-0" />
+      <span className="text-muted-foreground">{label}:</span>
+      <audio controls className="h-8" preload="none">
+        <source src={`data:audio/mp3;base64,${base64}`} type="audio/mpeg" />
+      </audio>
+    </div>
+  );
 }
 
 /** Determine which enrichment fields are available/needed for a note */
@@ -60,6 +73,16 @@ function getEnrichableFields(note: AnkiNote) {
         available: hasSentence,
         filled: !!getFieldValue(note, "Picture"),
         label: "Image",
+      },
+      audio: {
+        available: true,
+        filled: !!getFieldValue(note, "Audio"),
+        label: "Word Audio",
+      },
+      sentence_audio: {
+        available: hasSentence,
+        filled: !!getFieldValue(note, "Main Sentence Audio"),
+        label: "Sentence Audio",
       },
     } as Record<EnrichField, { available: boolean; filled: boolean; label: string }>,
   };
@@ -163,7 +186,11 @@ function EnrichCard({
                                 ? "Has image"
                                 : key === "extra_info"
                                   ? "Has examples"
-                                  : "—"
+                                  : key === "audio"
+                                    ? "Has audio"
+                                    : key === "sentence_audio"
+                                      ? "Has audio"
+                                      : "—"
                       : f.available
                         ? "Empty"
                         : "Needs sentence"}
@@ -226,25 +253,25 @@ function EnrichCard({
           {state.results && (
             <div className="rounded-md bg-muted/50 p-3 text-xs space-y-1">
               <p className="font-medium">Generated results:</p>
-              {state.results.sentence && (
+              {!!state.results.sentence && (
                 <p>
                   <span className="text-muted-foreground">Sentence:</span>{" "}
                   {state.results.sentence as string}
                 </p>
               )}
-              {state.results.definition && (
+              {!!state.results.definition && (
                 <p>
                   <span className="text-muted-foreground">Definition:</span>{" "}
                   {stripHtml(state.results.definition as string)}
                 </p>
               )}
-              {state.results.phonetic && (
+              {!!state.results.phonetic && (
                 <p>
                   <span className="text-muted-foreground">Phonetic:</span>{" "}
                   {state.results.phonetic as string}
                 </p>
               )}
-              {state.results.synonyms && (
+              {!!state.results.synonyms && (
                 <p>
                   <span className="text-muted-foreground">Synonyms:</span>{" "}
                   {Array.isArray(state.results.synonyms)
@@ -252,18 +279,40 @@ function EnrichCard({
                     : String(state.results.synonyms)}
                 </p>
               )}
-              {state.results.extra_info && (
+              {!!state.results.extra_info && (
                 <p>
                   <span className="text-muted-foreground">Extra:</span>{" "}
                   {stripHtml(state.results.extra_info as string)}
                 </p>
               )}
-              {state.results.image && (
+              {!!state.results.image && (
                 <p className="text-success">Image generated</p>
               )}
-              {state.results.image_error && (
+              {!!state.results.image_error && (
                 <p className="text-destructive">
                   Image: {state.results.image_error as string}
+                </p>
+              )}
+              {!!state.results.audio && (
+                <AudioPreview
+                  base64={(state.results.audio as { base64: string }).base64}
+                  label="Word Audio"
+                />
+              )}
+              {!!state.results.audio_error && (
+                <p className="text-destructive">
+                  Word Audio: {state.results.audio_error as string}
+                </p>
+              )}
+              {!!state.results.sentence_audio && (
+                <AudioPreview
+                  base64={(state.results.sentence_audio as { base64: string }).base64}
+                  label="Sentence Audio"
+                />
+              )}
+              {!!state.results.sentence_audio_error && (
+                <p className="text-destructive">
+                  Sentence Audio: {state.results.sentence_audio_error as string}
                 </p>
               )}
             </div>
@@ -471,6 +520,42 @@ function EnrichContent() {
       }
     }
 
+    // Handle audio: store MP3 in Anki media, set [sound:filename] format
+    if (r.audio && typeof r.audio === "object") {
+      const audio = r.audio as { base64: string; format: string };
+      const word = getFieldValue(note, "Word").replace(/\s+/g, "_");
+      const filename = `spelling_${word}_${noteId}.mp3`;
+
+      try {
+        await fetch("/api/anki/media", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ filename, data: audio.base64 }),
+        });
+        fields["Audio"] = `[sound:${filename}]`;
+      } catch {
+        // Audio save failed, skip
+      }
+    }
+
+    // Handle sentence audio
+    if (r.sentence_audio && typeof r.sentence_audio === "object") {
+      const audio = r.sentence_audio as { base64: string; format: string };
+      const word = getFieldValue(note, "Word").replace(/\s+/g, "_");
+      const filename = `spelling_${word}_${noteId}_sentence.mp3`;
+
+      try {
+        await fetch("/api/anki/media", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ filename, data: audio.base64 }),
+        });
+        fields["Main Sentence Audio"] = `[sound:${filename}]`;
+      } catch {
+        // Sentence audio save failed, skip
+      }
+    }
+
     if (Object.keys(fields).length === 0) return;
 
     try {
@@ -560,8 +645,8 @@ export default function EnrichPage() {
       <div>
         <h2 className="text-2xl font-bold tracking-tight">Enrich Cards</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Generate sentences, definitions, phonetics, synonyms, and images for
-          your cards
+          Generate sentences, definitions, phonetics, synonyms, images, and audio
+          for your cards
         </p>
       </div>
       <Suspense
