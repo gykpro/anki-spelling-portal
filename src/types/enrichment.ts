@@ -33,6 +33,23 @@ export interface EnrichmentProgress {
 }
 
 export interface BatchEnrichRequest {
-  noteIds: number[];
-  fields: ("definition" | "audio" | "sentenceAudio" | "image")[];
+  cards: { noteId: number; word: string; sentence?: string }[];
+  fields: ("sentence" | "definition" | "phonetic" | "synonyms" | "extra_info")[];
+}
+
+export interface BatchEnrichResultItem {
+  noteId: number;
+  word: string;
+  sentence?: string;
+  definition?: string;
+  phonetic?: string;
+  synonyms?: string[];
+  extra_info?: string;
+  error?: string;
+}
+
+export interface BatchEnrichResponse {
+  results: BatchEnrichResultItem[];
+  succeeded: number;
+  failed: number;
 }

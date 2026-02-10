@@ -153,6 +153,33 @@ Pre-requisites: Anki running with AnkiConnect, dev server on localhost:3000.
 - Verify card refreshes, "Word Audio" field now shows "Has audio"
 - In Anki, verify the Audio field contains `[sound:spelling_<word>_<noteId>.mp3]`
 
+### 4k. Batch enrich — happy path
+- Quick Add 3 test words: `__test_batch_one`, `__test_batch_two`, `__test_batch_three`
+- Navigate to `/enrich` with those 3 note IDs
+- Verify "Enrich All Empty" button visible in toolbar with count (3)
+- Click "Enrich All Empty"
+- Verify spinner appears, individual Generate buttons disabled
+- Wait for completion (up to 120s — single CLI call for all 3)
+- Verify all 3 cards show generated text results (sentence, definition, phonetic, synonyms, extra)
+- Verify "Save All" button appears with count (3)
+- Click "Save All"
+- Verify all cards saved to Anki (progress shown)
+- Refresh, verify all text fields populated
+
+### 4l. Batch enrich — per-card error handling
+- Quick Add 1 test word with unusual name: `__test_batch_odd_xyzzy`
+- Navigate to enrich with that card
+- Click "Enrich All Empty" — verify it processes (even single cards)
+- Verify result or error shown for that card
+
+### 4m. Batch with no empty fields
+- On a card that already has all text fields filled, verify "Enrich All Empty" shows count (0) and is disabled
+
+### 4n. Individual enrich still works after batch
+- After batch enrichment, expand one card
+- Select a single field manually
+- Click Generate (individual) — verify it still works independently
+
 ### 4j. Generate sentence audio (requires sentence)
 - On a test card that already has a Main Sentence, expand the card
 - Verify "Sentence Audio" button is available (not grayed out)
@@ -212,7 +239,7 @@ After all tests:
 ## Notes
 
 - Test words use `__test_` prefix for easy identification and cleanup
-- Claude CLI generation takes 15-30s per card — budget time accordingly
+- Claude CLI generation takes 15-30s per card (single) or 15-30s total (batch) — budget time accordingly
 - Image generation via Gemini takes 10-20s
 - If a step fails, screenshot the error state and note it before continuing
 - Skip section 1b if Anki cannot be stopped during testing

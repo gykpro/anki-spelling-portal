@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { runClaudeJSON } from "@/lib/claude-cli";
+import {
+  type TextEnrichField,
+  getFieldDescriptions,
+  ENRICH_SUFFIX,
+} from "@/lib/enrich-prompts";
 
 export type EnrichField =
   | "sentence"
@@ -25,33 +30,11 @@ function buildPrompt(word: string, sentence: string | undefined, fields: EnrichF
     parts.push(`Context sentence: "${sentence}"`);
   }
 
-  const requested: string[] = [];
-
-  if (fields.includes("sentence")) {
-    requested.push(
-      `"sentence": a natural example sentence using "${word}" that a 10-year-old can easily understand (10-20 words)`
-    );
-  }
-  if (fields.includes("definition")) {
-    requested.push(
-      `"definition": a clear, simple definition suitable for a 10-year-old child. If the word has multiple meanings, list the most common 1-2. Format as HTML: <ul><li>meaning one</li><li>meaning two</li></ul>`
-    );
-  }
-  if (fields.includes("phonetic")) {
-    requested.push(
-      `"phonetic": IPA pronunciation (e.g., /ˈkriːtʃər/). For multi-word phrases, give pronunciation of the key word.`
-    );
-  }
-  if (fields.includes("synonyms")) {
-    requested.push(
-      `"synonyms": 2-4 synonyms or related words/phrases, as a JSON array of strings`
-    );
-  }
-  if (fields.includes("extra_info")) {
-    requested.push(
-      `"extra_info": 2 additional example sentences using the word, formatted as HTML: <ul><li>sentence one</li><li>sentence two</li></ul>`
-    );
-  }
+  const textFields = fields.filter(
+    (f): f is TextEnrichField =>
+      !["image", "audio", "sentence_audio"].includes(f)
+  );
+  const requested = getFieldDescriptions(textFields);
 
   return `${parts.join("\n")}
 
@@ -60,10 +43,7 @@ Generate the following for this word/phrase. Return ONLY a JSON object, no markd
   ${requested.join(",\n  ")}
 }
 
-Important:
-- Keep language simple and appropriate for a 10-year-old
-- If it's a phrase (like "came down with"), treat it as a unit
-- For definitions of phrases, explain the idiomatic meaning`;
+${ENRICH_SUFFIX}`;
 }
 
 function stripHtmlServer(html: string): string {

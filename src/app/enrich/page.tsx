@@ -6,6 +6,7 @@ import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
 import { cn } from "@/lib/utils";
 import type { AnkiNote } from "@/types/anki";
 import type { EnrichField } from "@/app/api/enrich/route";
+import type { BatchEnrichResponse, BatchEnrichResultItem } from "@/types/enrichment";
 import {
   RefreshCw,
   Sparkles,
@@ -15,6 +16,7 @@ import {
   ChevronRight,
   Save,
   Volume2,
+  Zap,
 } from "lucide-react";
 
 function getFieldValue(note: AnkiNote, field: string): string {
@@ -104,6 +106,7 @@ function EnrichCard({
   onEnrich,
   onSave,
   onToggleExpand,
+  batchEnriching,
 }: {
   note: AnkiNote;
   state: NoteEnrichState;
@@ -111,6 +114,7 @@ function EnrichCard({
   onEnrich: () => void;
   onSave: () => void;
   onToggleExpand: () => void;
+  batchEnriching?: boolean;
 }) {
   const info = getEnrichableFields(note);
   const missingCount = Object.values(info.fields).filter(
@@ -214,7 +218,7 @@ function EnrichCard({
                     <button
                       key={key}
                       onClick={() => onToggleField(key)}
-                      disabled={state.enriching}
+                      disabled={state.enriching || !!batchEnriching}
                       className={cn(
                         "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
                         selected
@@ -330,7 +334,7 @@ function EnrichCard({
           <div className="flex gap-2">
             <button
               onClick={onEnrich}
-              disabled={state.enriching || state.selectedFields.size === 0}
+              disabled={state.enriching || batchEnriching || state.selectedFields.size === 0}
               className="inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-40"
             >
               {state.enriching ? (
@@ -362,6 +366,9 @@ function EnrichContent() {
   const [noteStates, setNoteStates] = useState<Record<number, NoteEnrichState>>(
     {}
   );
+  const [batchEnriching, setBatchEnriching] = useState(false);
+  const [savingAll, setSavingAll] = useState(false);
+  const [batchProgress, setBatchProgress] = useState("");
 
   const fetchNotes = useCallback(async () => {
     setLoading(true);
@@ -585,6 +592,155 @@ function EnrichContent() {
     }
   };
 
+  const enrichAllEmpty = async () => {
+    // Collect cards with any empty text fields
+    const textFieldKeys: EnrichField[] = [
+      "sentence", "definition", "phonetic", "synonyms", "extra_info",
+    ];
+
+    const cardsToEnrich: { noteId: number; word: string; sentence?: string; emptyFields: EnrichField[] }[] = [];
+
+    for (const note of notes) {
+      const info = getEnrichableFields(note);
+      const emptyTextFields = textFieldKeys.filter(
+        (f) => info.fields[f]?.available && !info.fields[f]?.filled
+      );
+      if (emptyTextFields.length > 0) {
+        cardsToEnrich.push({
+          noteId: note.noteId,
+          word: info.word,
+          sentence: info.hasSentence ? info.sentence : undefined,
+          emptyFields: emptyTextFields,
+        });
+      }
+    }
+
+    if (cardsToEnrich.length === 0) return;
+
+    setBatchEnriching(true);
+    setBatchProgress(`Enriching ${cardsToEnrich.length} cards...`);
+
+    // Mark all batch cards as enriching
+    setNoteStates((prev) => {
+      const next = { ...prev };
+      for (const c of cardsToEnrich) {
+        next[c.noteId] = { ...next[c.noteId], enriching: true, error: null, saved: false };
+      }
+      return next;
+    });
+
+    try {
+      // Determine which fields are needed (union of all empty fields)
+      const allFields = [...new Set(cardsToEnrich.flatMap((c) => c.emptyFields))];
+
+      const res = await fetch("/api/enrich/batch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          cards: cardsToEnrich.map((c) => ({
+            noteId: c.noteId,
+            word: c.word,
+            sentence: c.sentence,
+          })),
+          fields: allFields,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Batch enrichment failed");
+      }
+
+      const data: BatchEnrichResponse = await res.json();
+      setBatchProgress(`Done: ${data.succeeded} succeeded, ${data.failed} failed`);
+
+      // Distribute results to per-card state
+      setNoteStates((prev) => {
+        const next = { ...prev };
+        for (const item of data.results) {
+          const existing = next[item.noteId];
+          if (!existing) continue;
+
+          if (item.error) {
+            next[item.noteId] = {
+              ...existing,
+              enriching: false,
+              error: item.error,
+            };
+          } else {
+            // Build results object compatible with single-card format
+            const results: Record<string, unknown> = { noteId: item.noteId, word: item.word };
+            if (item.sentence) results.sentence = item.sentence;
+            if (item.definition) results.definition = item.definition;
+            if (item.phonetic) results.phonetic = item.phonetic;
+            if (item.synonyms) results.synonyms = item.synonyms;
+            if (item.extra_info) results.extra_info = item.extra_info;
+
+            next[item.noteId] = {
+              ...existing,
+              enriching: false,
+              results: existing.results
+                ? { ...existing.results, ...results }
+                : results,
+              expanded: true,
+            };
+          }
+        }
+        return next;
+      });
+    } catch (err) {
+      // Mark all batch cards with error
+      setNoteStates((prev) => {
+        const next = { ...prev };
+        for (const c of cardsToEnrich) {
+          next[c.noteId] = {
+            ...next[c.noteId],
+            enriching: false,
+            error: err instanceof Error ? err.message : "Batch failed",
+          };
+        }
+        return next;
+      });
+      setBatchProgress("");
+    } finally {
+      setBatchEnriching(false);
+    }
+  };
+
+  const saveAll = async () => {
+    const unsavedNoteIds = notes
+      .filter((n) => noteStates[n.noteId]?.results && !noteStates[n.noteId]?.saved)
+      .map((n) => n.noteId);
+
+    if (unsavedNoteIds.length === 0) return;
+
+    setSavingAll(true);
+    setBatchProgress(`Saving ${unsavedNoteIds.length} cards...`);
+
+    let savedCount = 0;
+    for (const noteId of unsavedNoteIds) {
+      await save(noteId);
+      savedCount++;
+      setBatchProgress(`Saved ${savedCount}/${unsavedNoteIds.length}...`);
+    }
+
+    setBatchProgress(`All ${savedCount} cards saved`);
+    setSavingAll(false);
+  };
+
+  // Count cards with empty text fields
+  const cardsWithEmptyText = notes.filter((note) => {
+    const info = getEnrichableFields(note);
+    return ["sentence", "definition", "phonetic", "synonyms", "extra_info"].some(
+      (f) => info.fields[f as EnrichField]?.available && !info.fields[f as EnrichField]?.filled
+    );
+  }).length;
+
+  // Count unsaved results
+  const unsavedCount = notes.filter(
+    (n) => noteStates[n.noteId]?.results && !noteStates[n.noteId]?.saved
+  ).length;
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -610,11 +766,50 @@ function EnrichContent() {
         </p>
         <button
           onClick={fetchNotes}
-          className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted"
+          disabled={batchEnriching || savingAll}
+          className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted disabled:opacity-40"
         >
           <RefreshCw className="h-3 w-3" /> Refresh
         </button>
       </div>
+
+      {/* Batch toolbar */}
+      <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/30 p-3">
+        <button
+          onClick={enrichAllEmpty}
+          disabled={batchEnriching || savingAll || cardsWithEmptyText === 0}
+          className="inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-40"
+        >
+          {batchEnriching ? (
+            <LoadingSpinner size="sm" className="text-primary-foreground" />
+          ) : (
+            <Zap className="h-3.5 w-3.5" />
+          )}
+          {batchEnriching
+            ? "Enriching..."
+            : `Enrich All Empty (${cardsWithEmptyText})`}
+        </button>
+
+        {unsavedCount > 0 && (
+          <button
+            onClick={saveAll}
+            disabled={batchEnriching || savingAll}
+            className="inline-flex items-center gap-1.5 rounded-md bg-success px-4 py-1.5 text-xs font-medium text-success-foreground hover:opacity-90 disabled:opacity-40"
+          >
+            {savingAll ? (
+              <LoadingSpinner size="sm" className="text-success-foreground" />
+            ) : (
+              <Save className="h-3.5 w-3.5" />
+            )}
+            {savingAll ? "Saving..." : `Save All (${unsavedCount})`}
+          </button>
+        )}
+
+        {batchProgress && (
+          <span className="text-xs text-muted-foreground">{batchProgress}</span>
+        )}
+      </div>
+
       {notes.map((note) => (
         <EnrichCard
           key={note.noteId}
@@ -633,6 +828,7 @@ function EnrichContent() {
           onEnrich={() => enrich(note.noteId)}
           onSave={() => save(note.noteId)}
           onToggleExpand={() => toggleExpand(note.noteId)}
+          batchEnriching={batchEnriching}
         />
       ))}
     </div>
