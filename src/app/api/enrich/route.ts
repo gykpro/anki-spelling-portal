@@ -193,7 +193,17 @@ async function generateImage(
   const apiKey = process.env.NANO_BANANA_API_KEY;
   if (!apiKey) throw new Error("NANO_BANANA_API_KEY not configured");
 
-  const prompt = `Generate a colorful cartoon-style illustration representing this scenario. The image should be intuitive to understand for a 10-year-old child. The sentence is: "${sentence}". The key word is "${word}".`;
+  const prompt = `Create a simple, clear cartoon illustration for a children's vocabulary flashcard.
+
+The illustration must accurately and literally depict this sentence: "${sentence}"
+The key vocabulary word is: "${word}"
+
+Requirements:
+- Show exactly what the sentence describes — do not add extra characters, objects, or actions not mentioned
+- Real-world objects must look physically correct (right number of limbs, fingers, wheels, handles, etc.) — no anatomical or structural errors
+- Use bright, friendly colors
+- Keep the composition simple and uncluttered — one clear focal point
+- The illustration should help a 10-year-old understand and remember the word "${word}"`;
 
   const res = await fetch(
     "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent",
