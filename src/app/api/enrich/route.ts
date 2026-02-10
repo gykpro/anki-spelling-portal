@@ -196,7 +196,7 @@ async function generateImage(
   const prompt = `Generate a colorful cartoon-style illustration representing this scenario. The image should be intuitive to understand for a 10-year-old child. The sentence is: "${sentence}". The key word is "${word}".`;
 
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${apiKey}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -208,7 +208,6 @@ async function generateImage(
         ],
         generationConfig: {
           responseModalities: ["IMAGE", "TEXT"],
-          responseMimeType: "image/png",
         },
       }),
     }
