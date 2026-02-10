@@ -1,8 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { execFile } from "child_process";
-import { promisify } from "util";
-
-const execFileAsync = promisify(execFile);
+import { runClaudeJSON } from "@/lib/claude-cli";
 
 export type EnrichField =
   | "sentence"
@@ -79,41 +76,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Separate text fields (Claude Code) from media fields (direct API)
     const textFields = fields.filter((f) => f !== "image");
     const needsImage = fields.includes("image");
 
     const results: Record<string, unknown> = { noteId, word };
 
-    // Generate text fields via Claude Code CLI
+    // Generate text fields via Claude Code CLI (stdin piped)
     if (textFields.length > 0) {
       const prompt = buildPrompt(word, sentence, textFields);
-
-      const { stdout } = await execFileAsync(
-        "claude",
-        [
-          "-p", prompt,
-          "--output-format", "json",
-          "--max-budget-usd", "5",
-          "--permission-mode", "bypassPermissions",
-          "--no-session-persistence",
-        ],
-        {
-          timeout: 60_000,
-          maxBuffer: 10 * 1024 * 1024,
-          env: { ...process.env, FORCE_COLOR: "0" },
-        }
-      );
-
-      const cliOutput = JSON.parse(stdout);
-      let resultText = cliOutput.type === "result" ? cliOutput.result : stdout;
-
-      let jsonStr = resultText.trim();
-      if (jsonStr.startsWith("```")) {
-        jsonStr = jsonStr.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
-      }
-
-      const parsed = JSON.parse(jsonStr);
+      const parsed = await runClaudeJSON<Record<string, unknown>>(prompt, {
+        timeout: 60_000,
+      });
       Object.assign(results, parsed);
     }
 
@@ -178,7 +151,6 @@ async function generateImage(
 
   const data = await res.json();
 
-  // Find image part in response
   for (const candidate of data.candidates || []) {
     for (const part of candidate.content?.parts || []) {
       if (part.inlineData) {

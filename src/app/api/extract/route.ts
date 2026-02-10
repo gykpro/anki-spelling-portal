@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { writeFile, mkdir } from "fs/promises";
 import { join } from "path";
-import { execFile } from "child_process";
-import { promisify } from "util";
+import { runClaudeJSON } from "@/lib/claude-cli";
 
-const execFileAsync = promisify(execFile);
 const UPLOAD_DIR = join(process.cwd(), ".uploads");
 
 const EXTRACTION_PROMPT = `You are extracting spelling worksheet data. For each image file listed below, read it and extract the data.
@@ -64,41 +62,11 @@ export async function POST(request: NextRequest) {
     const fileList = filePaths.map((p) => `- ${p}`).join("\n");
     const prompt = EXTRACTION_PROMPT + fileList;
 
-    // Invoke Claude Code CLI using the user's Max subscription
-    const { stdout } = await execFileAsync(
-      "claude",
-      [
-        "-p", prompt,
-        "--output-format", "json",
-        "--allowed-tools", "Read",
-        "--max-budget-usd", "5",
-        "--permission-mode", "bypassPermissions",
-        "--no-session-persistence",
-      ],
-      {
-        timeout: 120_000,
-        maxBuffer: 10 * 1024 * 1024,
-        env: { ...process.env, FORCE_COLOR: "0" },
-      }
-    );
-
-    // Parse Claude Code JSON output: { "type": "result", "result": "..." }
-    const cliOutput = JSON.parse(stdout);
-    let resultText: string;
-
-    if (cliOutput.type === "result") {
-      resultText = cliOutput.result;
-    } else {
-      throw new Error("Unexpected CLI output format");
-    }
-
-    // Strip markdown code fences if present
-    let jsonStr = resultText.trim();
-    if (jsonStr.startsWith("```")) {
-      jsonStr = jsonStr.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
-    }
-
-    const pages = JSON.parse(jsonStr);
+    // Invoke Claude Code CLI via stdin pipe
+    const pages = await runClaudeJSON(prompt, {
+      timeout: 120_000,
+      allowedTools: ["Read"],
+    });
 
     return NextResponse.json({ pages });
   } catch (error) {

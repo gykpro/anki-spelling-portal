@@ -16,7 +16,8 @@
       "Bash(git commit -m \"$\\(cat <<''EOF''\nPhase 1 MVP: Upload → Extract → Review → Submit pipeline\n\n- Next.js 15 + React 19 + Tailwind CSS v4 portal\n- Claude Code CLI integration for extraction \\(uses Max subscription, no API key\\)\n- AnkiConnect client for card management\n- Upload page with drag-drop, inline sentence editing, Anki submission\n- Browse page with search and selection\n- Enrich page placeholder \\(Phase 2/3\\)\n- Dashboard with AnkiConnect health checks\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\")",
       "Bash(npm run dev:*)",
       "Bash(kill:*)",
-      "Bash(git commit -m \"$\\(cat <<''EOF''\nBrowse: add column sorting, quick filters, tag chips, pagination\n\n- Click column headers to sort asc/desc \\(word, sentence, definition, audio, image, tags\\)\n- Quick filter chips: All, No Definition, No Audio, No Image, Complete \\(with counts\\)\n- Tag chips for fast filtering by term/week\n- Pagination with 20/50/100 per page, first/prev/next/last controls\n- Selection now scoped to current page\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\")"
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nBrowse: add column sorting, quick filters, tag chips, pagination\n\n- Click column headers to sort asc/desc \\(word, sentence, definition, audio, image, tags\\)\n- Quick filter chips: All, No Definition, No Audio, No Image, Complete \\(with counts\\)\n- Tag chips for fast filtering by term/week\n- Pagination with 20/50/100 per page, first/prev/next/last controls\n- Selection now scoped to current page\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git commit:*)"
     ]
   }
 }
