@@ -199,6 +199,7 @@ The illustration must accurately and literally depict this sentence: "${sentence
 The key vocabulary word is: "${word}"
 
 Requirements:
+- Create a scene, but do not literally put the sentence in the result picture
 - Show exactly what the sentence describes — do not add extra characters, objects, or actions not mentioned
 - Real-world objects must look physically correct (right number of limbs, fingers, wheels, handles, etc.) — no anatomical or structural errors
 - Use bright, friendly colors
