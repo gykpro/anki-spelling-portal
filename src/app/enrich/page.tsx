@@ -17,6 +17,7 @@ import {
   Save,
   Volume2,
   Zap,
+  ImageIcon,
 } from "lucide-react";
 
 function getFieldValue(note: AnkiNote, field: string): string {
@@ -812,6 +813,84 @@ function EnrichContent() {
     setBatchEnriching(false);
   };
 
+  const generateAllImages = async () => {
+    // Collect cards where image is available (has sentence) AND not filled
+    const cardsNeedingImages: { noteId: number; word: string; sentence: string }[] = [];
+
+    for (const note of notes) {
+      const info = getEnrichableFields(note);
+      if (info.fields.image.available && !info.fields.image.filled) {
+        cardsNeedingImages.push({
+          noteId: note.noteId,
+          word: info.word,
+          sentence: info.sentence,
+        });
+      }
+    }
+
+    if (cardsNeedingImages.length === 0) return;
+
+    setBatchEnriching(true);
+    setBatchProgress(`Images 0/${cardsNeedingImages.length}...`);
+
+    // Mark all cards as enriching
+    setNoteStates((prev) => {
+      const next = { ...prev };
+      for (const c of cardsNeedingImages) {
+        next[c.noteId] = { ...next[c.noteId], enriching: true, error: null };
+      }
+      return next;
+    });
+
+    for (let i = 0; i < cardsNeedingImages.length; i++) {
+      const card = cardsNeedingImages[i];
+      setBatchProgress(`Images ${i + 1}/${cardsNeedingImages.length}: ${card.word}...`);
+
+      try {
+        const res = await fetch("/api/enrich", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            noteId: card.noteId,
+            word: card.word,
+            sentence: card.sentence,
+            fields: ["image"],
+          }),
+        });
+
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.error || "Image generation failed");
+        }
+
+        const results = await res.json();
+        setNoteStates((prev) => ({
+          ...prev,
+          [card.noteId]: {
+            ...prev[card.noteId],
+            enriching: false,
+            results: prev[card.noteId].results
+              ? { ...prev[card.noteId].results, ...results }
+              : results,
+            expanded: true,
+          },
+        }));
+      } catch (err) {
+        setNoteStates((prev) => ({
+          ...prev,
+          [card.noteId]: {
+            ...prev[card.noteId],
+            enriching: false,
+            error: err instanceof Error ? err.message : "Image failed",
+          },
+        }));
+      }
+    }
+
+    setBatchProgress(`Images done for ${cardsNeedingImages.length} cards`);
+    setBatchEnriching(false);
+  };
+
   // Auto-enrich pipeline: text → save → audio → save
   const runAutoEnrichPipeline = useCallback(async (currentNotes: AnkiNote[]) => {
     const textFieldKeys: EnrichField[] = [
@@ -1048,6 +1127,12 @@ function EnrichContent() {
     );
   }).length;
 
+  // Count cards with missing images (available = has sentence, not filled)
+  const cardsWithMissingImages = notes.filter((note) => {
+    const info = getEnrichableFields(note);
+    return info.fields.image.available && !info.fields.image.filled;
+  }).length;
+
   // Count unsaved results
   const unsavedCount = notes.filter(
     (n) => noteStates[n.noteId]?.results && !noteStates[n.noteId]?.saved
@@ -1115,6 +1200,21 @@ function EnrichContent() {
           {batchEnriching
             ? "Generating..."
             : `Generate All Audio (${cardsWithMissingAudio})`}
+        </button>
+
+        <button
+          onClick={generateAllImages}
+          disabled={batchEnriching || savingAll || cardsWithMissingImages === 0}
+          className="inline-flex items-center gap-1.5 rounded-md bg-primary/80 px-4 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-40"
+        >
+          {batchEnriching ? (
+            <LoadingSpinner size="sm" className="text-primary-foreground" />
+          ) : (
+            <ImageIcon className="h-3.5 w-3.5" />
+          )}
+          {batchEnriching
+            ? "Generating..."
+            : `Generate All Images (${cardsWithMissingImages})`}
         </button>
 
         {unsavedCount > 0 && (

@@ -251,6 +251,18 @@ Pre-requisites: Anki running with AnkiConnect, dev server on localhost:3000.
 - Click "Save All", verify all audio saved to Anki
 - Refresh, verify audio fields show "Has audio"
 
+### 4p. Batch image generation
+- On the enrich page with cards that have sentences but missing images
+- Verify "Generate All Images (N)" button appears in toolbar with correct count
+- Verify button is disabled when N=0 or during batch enrichment
+- Click "Generate All Images"
+- Verify spinner appears, progress shows "Images 1/N: word..."
+- Wait for all images to finish (up to 15s per card)
+- Verify each card expands and shows "Image generated" in results preview
+- Verify "Save All" button appears with correct unsaved count
+- Click "Save All", verify all images saved to Anki
+- Refresh, verify image fields show "Has image"
+
 ### 4j. Generate sentence audio (requires sentence)
 - On a test card that already has a Main Sentence, expand the card
 - Verify "Sentence Audio" button is available (not grayed out)
