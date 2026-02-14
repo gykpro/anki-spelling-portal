@@ -11,6 +11,13 @@ Follow this order for every feature request or change:
 5. **Commit** — After tests pass, create a git commit with a descriptive message summarizing the change.
 6. **CRITICAL — Continue** — NEVER stop after a commit. Always do one of: (a) if there are more features to implement, immediately start the next one (back to step 1); (b) if unsure what to do next, use `AskUserQuestion` with a menu of options. You must NEVER end your turn silently after step 5. Stopping without asking is a workflow violation.
 
+## Task Tracking
+
+- Feature roadmap and pending tasks live in `docs/todo.md`. Always check this file at the start of a session to know what's pending.
+- After completing a feature: mark it `[x]` in `docs/todo.md` and move it to the "Completed" section.
+- After committing, check `docs/todo.md` for the next pending task and start it (or ask the user which one to do next).
+- When the user adds new feature requests, add them to `docs/todo.md` before starting work.
+
 ## Communication Style
 
 - When asking the user a question, always use `AskUserQuestion` with concrete options rather than open-ended text questions. Let the user pick from a menu instead of typing free-form answers.
