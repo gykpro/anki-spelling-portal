@@ -730,6 +730,88 @@ function EnrichContent() {
     setSavingAll(false);
   };
 
+  const generateAllAudio = async () => {
+    // Collect cards missing audio
+    const cardsNeedingAudio: { noteId: number; word: string; sentence?: string; fields: EnrichField[] }[] = [];
+
+    for (const note of notes) {
+      const info = getEnrichableFields(note);
+      const audioFields: EnrichField[] = [];
+      if (!info.fields.audio.filled) audioFields.push("audio");
+      if (info.fields.sentence_audio.available && !info.fields.sentence_audio.filled) audioFields.push("sentence_audio");
+      if (audioFields.length > 0) {
+        cardsNeedingAudio.push({
+          noteId: note.noteId,
+          word: info.word,
+          sentence: info.hasSentence ? info.sentence : undefined,
+          fields: audioFields,
+        });
+      }
+    }
+
+    if (cardsNeedingAudio.length === 0) return;
+
+    setBatchEnriching(true);
+    setBatchProgress(`Audio 0/${cardsNeedingAudio.length}...`);
+
+    // Mark all cards as enriching
+    setNoteStates((prev) => {
+      const next = { ...prev };
+      for (const c of cardsNeedingAudio) {
+        next[c.noteId] = { ...next[c.noteId], enriching: true, error: null };
+      }
+      return next;
+    });
+
+    for (let i = 0; i < cardsNeedingAudio.length; i++) {
+      const card = cardsNeedingAudio[i];
+      setBatchProgress(`Audio ${i + 1}/${cardsNeedingAudio.length}: ${card.word}...`);
+
+      try {
+        const res = await fetch("/api/enrich", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            noteId: card.noteId,
+            word: card.word,
+            sentence: card.sentence,
+            fields: card.fields,
+          }),
+        });
+
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.error || "Audio generation failed");
+        }
+
+        const results = await res.json();
+        setNoteStates((prev) => ({
+          ...prev,
+          [card.noteId]: {
+            ...prev[card.noteId],
+            enriching: false,
+            results: prev[card.noteId].results
+              ? { ...prev[card.noteId].results, ...results }
+              : results,
+            expanded: true,
+          },
+        }));
+      } catch (err) {
+        setNoteStates((prev) => ({
+          ...prev,
+          [card.noteId]: {
+            ...prev[card.noteId],
+            enriching: false,
+            error: err instanceof Error ? err.message : "Audio failed",
+          },
+        }));
+      }
+    }
+
+    setBatchProgress(`Audio done for ${cardsNeedingAudio.length} cards`);
+    setBatchEnriching(false);
+  };
+
   // Auto-enrich pipeline: text → save → audio → save
   const runAutoEnrichPipeline = useCallback(async (currentNotes: AnkiNote[]) => {
     const textFieldKeys: EnrichField[] = [
@@ -957,6 +1039,15 @@ function EnrichContent() {
     );
   }).length;
 
+  // Count cards with missing audio
+  const cardsWithMissingAudio = notes.filter((note) => {
+    const info = getEnrichableFields(note);
+    return (
+      !info.fields.audio.filled ||
+      (info.fields.sentence_audio.available && !info.fields.sentence_audio.filled)
+    );
+  }).length;
+
   // Count unsaved results
   const unsavedCount = notes.filter(
     (n) => noteStates[n.noteId]?.results && !noteStates[n.noteId]?.saved
@@ -1009,6 +1100,21 @@ function EnrichContent() {
           {batchEnriching
             ? "Enriching..."
             : `Enrich All Empty (${cardsWithEmptyText})`}
+        </button>
+
+        <button
+          onClick={generateAllAudio}
+          disabled={batchEnriching || savingAll || cardsWithMissingAudio === 0}
+          className="inline-flex items-center gap-1.5 rounded-md bg-primary/80 px-4 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-40"
+        >
+          {batchEnriching ? (
+            <LoadingSpinner size="sm" className="text-primary-foreground" />
+          ) : (
+            <Volume2 className="h-3.5 w-3.5" />
+          )}
+          {batchEnriching
+            ? "Generating..."
+            : `Generate All Audio (${cardsWithMissingAudio})`}
         </button>
 
         {unsavedCount > 0 && (

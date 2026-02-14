@@ -239,6 +239,18 @@ Pre-requisites: Anki running with AnkiConnect, dev server on localhost:3000.
 - Select a single field manually
 - Click Generate (individual) — verify it still works independently
 
+### 4o. Batch audio generation
+- On the enrich page with cards that have text fields filled but missing audio
+- Verify "Generate All Audio (N)" button appears in toolbar with correct count
+- Verify button is disabled when N=0 or during batch enrichment
+- Click "Generate All Audio"
+- Verify spinner appears, progress shows "Audio 1/N: word..."
+- Wait for all audio to finish (up to 15s per card)
+- Verify each card expands and shows audio player in results preview
+- Verify "Save All" button appears with correct unsaved count
+- Click "Save All", verify all audio saved to Anki
+- Refresh, verify audio fields show "Has audio"
+
 ### 4j. Generate sentence audio (requires sentence)
 - On a test card that already has a Main Sentence, expand the card
 - Verify "Sentence Audio" button is available (not grayed out)
