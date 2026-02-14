@@ -19,6 +19,23 @@ Pre-requisites: Anki running with AnkiConnect, dev server on localhost:3000.
 - Navigate to `/`, verify disconnected/error states appear
 - Restart Anki, click Refresh, verify recovery
 
+### 1d. Needs Attention — stats display
+- Navigate to `/`
+- Verify "Card Completeness" section appears between System Status and Quick Actions
+- Verify it shows "X of Y cards need attention" (or "All N cards are complete" if none missing)
+- Verify stat chips show: "No Definition (N)", "No Audio (N)", "No Image (N)", "Complete (N)"
+- Compare counts: navigate to `/browse`, apply "No Definition" filter, verify count matches dashboard chip
+- Return to `/`, verify "Enrich N cards" button is shown when cards need attention
+
+### 1e. Needs Attention — enrich link
+- On dashboard, click the "Enrich N cards" button
+- Verify it navigates to `/enrich?noteIds=...`
+- Verify the enrich page loads with the correct number of cards matching the dashboard count
+
+### 1f. Needs Attention — all complete state
+- If all cards are complete, verify green "All N cards are complete" message with checkmark icon
+- If not all complete, skip this test (cannot easily force all-complete state)
+
 ### 1c. Navigation
 - Click each sidebar link (Dashboard, Upload, Quick Add, Browse, Enrich)
 - Verify each page loads without error

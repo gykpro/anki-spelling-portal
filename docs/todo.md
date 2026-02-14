@@ -2,9 +2,9 @@
 
 ## Completed
 - [x] **Feature 1: Duplicate Detection on Add** — Pre-check words against existing Anki notes before submission. Quick Add shows warning panel; upload flow shows "duplicate" badge.
+- [x] **Feature 2: Dashboard "Needs Attention" Section** — Show counts of cards with missing fields on the dashboard. One-click link to enrich them.
 
 ## In Progress
-- [ ] **Feature 2: Dashboard "Needs Attention" Section** — Show counts of cards with missing fields on the dashboard. One-click link to enrich them.
 
 ## Pending
 - [ ] **Feature 5: Auto-Enrich on Add** — After adding words, offer one-click "Add & Enrich All" that submits words and immediately starts batch enrichment.

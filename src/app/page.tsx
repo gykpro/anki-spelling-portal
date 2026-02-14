@@ -1,13 +1,55 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Upload, Library, Sparkles, PenLine } from "lucide-react";
+import {
+  Upload,
+  Library,
+  Sparkles,
+  PenLine,
+  AlertTriangle,
+  CheckCircle2,
+} from "lucide-react";
 import { useAnkiConnection } from "@/hooks/useAnkiConnection";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
 
+interface DeckStats {
+  total: number;
+  missingDefinition: number;
+  missingAudio: number;
+  missingImage: number;
+  missingSentence: number;
+  complete: number;
+  needsAttention: number;
+  needsAttentionNoteIds: number[];
+}
+
 export default function DashboardPage() {
   const { status, loading, refresh } = useAnkiConnection();
+  const [stats, setStats] = useState<DeckStats | null>(null);
+  const [statsLoading, setStatsLoading] = useState(true);
+  const [statsError, setStatsError] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function fetchStats() {
+      try {
+        setStatsLoading(true);
+        setStatsError(null);
+        const res = await fetch("/api/stats");
+        if (!res.ok) throw new Error("Failed to fetch stats");
+        const data = await res.json();
+        setStats(data);
+      } catch (err) {
+        setStatsError(
+          err instanceof Error ? err.message : "Failed to load stats"
+        );
+      } finally {
+        setStatsLoading(false);
+      }
+    }
+    fetchStats();
+  }, []);
 
   return (
     <div className="space-y-8">
@@ -67,6 +109,72 @@ export default function DashboardPage() {
                 }
               />
             </div>
+          </div>
+        ) : null}
+      </div>
+
+      {/* Needs Attention */}
+      <div className="rounded-lg border border-border p-5">
+        <h3 className="text-sm font-semibold">Card Completeness</h3>
+        {statsLoading ? (
+          <div className="mt-4 flex items-center gap-2">
+            <LoadingSpinner size="sm" />
+            <span className="text-sm text-muted-foreground">
+              Loading stats...
+            </span>
+          </div>
+        ) : statsError ? (
+          <div className="mt-4 flex items-center gap-2 text-sm text-destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <span>{statsError}</span>
+          </div>
+        ) : stats && stats.needsAttention > 0 ? (
+          <div className="mt-4 space-y-4">
+            <div className="flex items-center gap-2 text-sm">
+              <AlertTriangle className="h-4 w-4 text-amber-500" />
+              <span>
+                <span className="font-semibold">{stats.needsAttention}</span> of{" "}
+                <span className="font-semibold">{stats.total}</span> cards need
+                attention
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Link
+                href="/browse?filter=missing_definition"
+                className="inline-flex items-center rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-800 transition-colors hover:bg-amber-100 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-300 dark:hover:bg-amber-900"
+              >
+                No Definition ({stats.missingDefinition})
+              </Link>
+              <Link
+                href="/browse?filter=missing_audio"
+                className="inline-flex items-center rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-800 transition-colors hover:bg-amber-100 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-300 dark:hover:bg-amber-900"
+              >
+                No Audio ({stats.missingAudio})
+              </Link>
+              <Link
+                href="/browse?filter=missing_image"
+                className="inline-flex items-center rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-800 transition-colors hover:bg-amber-100 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-300 dark:hover:bg-amber-900"
+              >
+                No Image ({stats.missingImage})
+              </Link>
+              <span className="inline-flex items-center rounded-full border border-green-300 bg-green-50 px-3 py-1 text-xs font-medium text-green-800 dark:border-green-700 dark:bg-green-950 dark:text-green-300">
+                Complete ({stats.complete})
+              </span>
+            </div>
+            <Link
+              href={`/enrich?noteIds=${stats.needsAttentionNoteIds.join(",")}`}
+              className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+            >
+              <Sparkles className="h-4 w-4" />
+              Enrich {stats.needsAttention} cards
+            </Link>
+          </div>
+        ) : stats ? (
+          <div className="mt-4 flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
+            <CheckCircle2 className="h-4 w-4" />
+            <span>
+              All {stats.total} cards are complete
+            </span>
           </div>
         ) : null}
       </div>
