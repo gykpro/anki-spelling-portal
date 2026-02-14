@@ -9,6 +9,11 @@ Follow this order for every feature request or change:
 3. **Update tests** — If the change affects UI behavior, update `tests/ui-test-plan.md` to reflect new or modified scenarios. Add new sections for new features, revise existing steps for changed behavior, remove obsolete cases.
 4. **Self-test** — Always run the UI test plan sections related to the new/changed features via browser automation. This is mandatory, not optional. Report results in a table. Fix any failures before proceeding.
 5. **Commit** — After tests pass, create a git commit with a descriptive message summarizing the change.
+6. **CRITICAL — Continue** — NEVER stop after a commit. Always do one of: (a) if there are more features to implement, immediately start the next one (back to step 1); (b) if unsure what to do next, use `AskUserQuestion` with a menu of options. You must NEVER end your turn silently after step 5. Stopping without asking is a workflow violation.
+
+## Communication Style
+
+- When asking the user a question, always use `AskUserQuestion` with concrete options rather than open-ended text questions. Let the user pick from a menu instead of typing free-form answers.
 
 ## When to Commit
 
