@@ -83,6 +83,27 @@ Pre-requisites: Anki running with AnkiConnect, dev server on localhost:3000.
 - Enter only `__test_dup_delta` (new word)
 - Submit — verify no warning panel, proceeds directly to success
 
+### 2g. Auto-Enrich button on success
+- Navigate to `/quick-add`
+- Enter 2 test words: `__test_autoenrich_one`, `__test_autoenrich_two`
+- Submit, verify success message
+- Verify "Enrich 2 Cards" button appears (primary style, Sparkles icon)
+- Verify "Add More" button appears (secondary style)
+- Verify "All Cards" link appears (secondary/outline style)
+- Inspect the "Enrich 2 Cards" href — should contain `noteIds=<id1>,<id2>&autoEnrich=true`
+
+### 2h. Auto-Enrich pipeline (end-to-end)
+- From the success screen in 2g, click "Enrich 2 Cards"
+- Verify enrich page loads with 2 cards
+- Verify auto-enrich progress banner appears with "Generating text fields..." phase
+- Wait for text generation to complete (up to 60s)
+- Verify phase changes to "Saving text to Anki..."
+- Verify phase changes to "Generating audio..."
+- Verify phase changes to "Saving audio..."
+- Verify final phase shows "Done! All cards enriched." with green success styling
+- Verify cards refresh and show populated fields (sentence, definition, phonetic, synonyms, extra info, audio)
+- Verify the `autoEnrich` param is removed from the URL (refresh should not re-trigger)
+
 ### 2f. Special characters
 - Enter words with special chars: `__test_it's`, `__test_re-enter`
 - Submit, verify they create successfully

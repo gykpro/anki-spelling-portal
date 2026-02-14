@@ -7,6 +7,7 @@ import {
   AlertTriangle,
   RotateCcw,
   Send,
+  Sparkles,
 } from "lucide-react";
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
 
@@ -20,6 +21,7 @@ export default function QuickAddPage() {
   const [result, setResult] = useState<{
     created: number;
     failed: number;
+    noteIds: number[];
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -62,7 +64,7 @@ export default function QuickAddPage() {
   const submitWords = useCallback(async (wordsToSubmit: string[]) => {
     if (wordsToSubmit.length === 0) {
       setPhase("done");
-      setResult({ created: 0, failed: 0 });
+      setResult({ created: 0, failed: 0, noteIds: [] });
       return;
     }
     setPhase("submitting");
@@ -101,7 +103,10 @@ export default function QuickAddPage() {
       }
 
       const data = await res.json();
-      setResult(data.summary);
+      const noteIds = (data.results as (number | null)[]).filter(
+        (id): id is number => id !== null
+      );
+      setResult({ ...data.summary, noteIds });
       setPhase("done");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Submit failed");
@@ -170,11 +175,19 @@ export default function QuickAddPage() {
             >
               <RotateCcw className="h-4 w-4" /> Add More
             </button>
+            {result.noteIds.length > 0 && (
+              <a
+                href={`/enrich?noteIds=${result.noteIds.join(",")}&autoEnrich=true`}
+                className="inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
+              >
+                <Sparkles className="h-4 w-4" /> Enrich {result.noteIds.length} Cards
+              </a>
+            )}
             <a
               href="/enrich"
-              className="inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
+              className="inline-flex items-center gap-1.5 rounded-md border border-border px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-muted"
             >
-              Enrich Cards
+              All Cards
             </a>
           </div>
         </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, Suspense } from "react";
+import { useState, useEffect, useCallback, useRef, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
 import { cn } from "@/lib/utils";
@@ -369,6 +369,8 @@ function EnrichContent() {
   const [batchEnriching, setBatchEnriching] = useState(false);
   const [savingAll, setSavingAll] = useState(false);
   const [batchProgress, setBatchProgress] = useState("");
+  const [autoEnrichPhase, setAutoEnrichPhase] = useState<string | null>(null);
+  const autoEnrichTriggered = useRef(false);
 
   const fetchNotes = useCallback(async () => {
     setLoading(true);
@@ -728,6 +730,225 @@ function EnrichContent() {
     setSavingAll(false);
   };
 
+  // Auto-enrich pipeline: text → save → audio → save
+  const runAutoEnrichPipeline = useCallback(async (currentNotes: AnkiNote[]) => {
+    const textFieldKeys: EnrichField[] = [
+      "sentence", "definition", "phonetic", "synonyms", "extra_info",
+    ];
+
+    // Phase 1: Batch text enrichment
+    setAutoEnrichPhase("Generating text fields...");
+    setBatchEnriching(true);
+
+    const cardsToEnrich = currentNotes.map((note) => {
+      const info = getEnrichableFields(note);
+      const emptyFields = textFieldKeys.filter(
+        (f) => info.fields[f]?.available && !info.fields[f]?.filled
+      );
+      return {
+        noteId: note.noteId,
+        word: info.word,
+        sentence: info.hasSentence ? info.sentence : undefined,
+        emptyFields,
+      };
+    }).filter((c) => c.emptyFields.length > 0);
+
+    let batchResults: BatchEnrichResultItem[] = [];
+
+    if (cardsToEnrich.length > 0) {
+      const allFields = [...new Set(cardsToEnrich.flatMap((c) => c.emptyFields))];
+
+      try {
+        setBatchProgress(`Enriching ${cardsToEnrich.length} cards...`);
+        const res = await fetch("/api/enrich/batch", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            cards: cardsToEnrich.map((c) => ({
+              noteId: c.noteId,
+              word: c.word,
+              sentence: c.sentence,
+            })),
+            fields: allFields,
+          }),
+        });
+
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.error || "Batch enrichment failed");
+        }
+
+        const data: BatchEnrichResponse = await res.json();
+        batchResults = data.results;
+        setBatchProgress(`Text: ${data.succeeded} succeeded, ${data.failed} failed`);
+      } catch (err) {
+        setAutoEnrichPhase(`Text enrichment failed: ${err instanceof Error ? err.message : "Unknown error"}`);
+        setBatchEnriching(false);
+        return;
+      }
+    }
+
+    // Phase 2: Save text results to Anki
+    setAutoEnrichPhase("Saving text to Anki...");
+    const successResults = batchResults.filter((r) => !r.error);
+    let savedCount = 0;
+
+    for (const item of successResults) {
+      const fields: Record<string, string> = {};
+      if (item.sentence) {
+        const escaped = item.word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const regex = new RegExp(`(${escaped})`, "i");
+        fields["Main Sentence"] = item.sentence.replace(
+          regex,
+          '<span class="nodeword">$1</span>'
+        );
+        fields["Cloze"] = item.sentence.replace(regex, "{{c1::$1}}");
+      }
+      if (item.definition) fields["Definition"] = item.definition;
+      if (item.phonetic) fields["Phonetic symbol"] = item.phonetic;
+      if (item.synonyms) {
+        fields["Synonyms"] = Array.isArray(item.synonyms)
+          ? item.synonyms.join(", ")
+          : String(item.synonyms);
+      }
+      if (item.extra_info) fields["Extra information"] = item.extra_info;
+
+      if (Object.keys(fields).length > 0) {
+        try {
+          await fetch(`/api/anki/notes/${item.noteId}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ fields }),
+          });
+          savedCount++;
+          setBatchProgress(`Saved text ${savedCount}/${successResults.length}...`);
+        } catch {
+          // Continue saving other cards
+        }
+      }
+    }
+
+    // Phase 3: Generate audio for each card
+    setAutoEnrichPhase("Generating audio...");
+    const audioResults: { noteId: number; word: string; data: Record<string, unknown> }[] = [];
+
+    for (let i = 0; i < currentNotes.length; i++) {
+      const note = currentNotes[i];
+      const word = getFieldValue(note, "Word");
+      // Use sentence from batch results if available, or existing sentence
+      const batchItem = batchResults.find((r) => r.noteId === note.noteId);
+      const sentence = batchItem?.sentence || stripHtml(getFieldValue(note, "Main Sentence")) || undefined;
+
+      const audioFields: EnrichField[] = ["audio"];
+      if (sentence) audioFields.push("sentence_audio");
+
+      setBatchProgress(`Audio ${i + 1}/${currentNotes.length}: ${word}...`);
+
+      try {
+        const res = await fetch("/api/enrich", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            noteId: note.noteId,
+            word,
+            sentence,
+            fields: audioFields,
+          }),
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          audioResults.push({ noteId: note.noteId, word, data });
+        }
+      } catch {
+        // Continue with other cards
+      }
+    }
+
+    // Phase 4: Save audio to Anki
+    setAutoEnrichPhase("Saving audio...");
+    let audioSaved = 0;
+
+    for (const { noteId, word, data } of audioResults) {
+      const fields: Record<string, string> = {};
+      const cleanWord = word.replace(/\s+/g, "_");
+
+      if (data.audio && typeof data.audio === "object") {
+        const audio = data.audio as { base64: string };
+        const filename = `spelling_${cleanWord}_${noteId}.mp3`;
+        try {
+          await fetch("/api/anki/media", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ filename, data: audio.base64 }),
+          });
+          fields["Audio"] = `[sound:${filename}]`;
+        } catch { /* skip */ }
+      }
+
+      if (data.sentence_audio && typeof data.sentence_audio === "object") {
+        const audio = data.sentence_audio as { base64: string };
+        const filename = `spelling_${cleanWord}_${noteId}_sentence.mp3`;
+        try {
+          await fetch("/api/anki/media", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ filename, data: audio.base64 }),
+          });
+          fields["Main Sentence Audio"] = `[sound:${filename}]`;
+        } catch { /* skip */ }
+      }
+
+      if (Object.keys(fields).length > 0) {
+        try {
+          await fetch(`/api/anki/notes/${noteId}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ fields }),
+          });
+          audioSaved++;
+          setBatchProgress(`Saved audio ${audioSaved}/${audioResults.length}...`);
+        } catch { /* skip */ }
+      }
+    }
+
+    // Done — build summary
+    const textFailed = batchResults.filter((r) => r.error).length;
+    const audioFailed = currentNotes.length - audioResults.length;
+    if (textFailed === 0 && audioFailed === 0) {
+      setAutoEnrichPhase("Done! All cards enriched.");
+    } else {
+      const parts: string[] = ["Done!"];
+      if (textFailed > 0) parts.push(`${textFailed} text failed`);
+      if (audioFailed > 0) parts.push(`${audioFailed} audio failed`);
+      setAutoEnrichPhase(parts.join(" "));
+    }
+    setBatchEnriching(false);
+    setBatchProgress("");
+    fetchNotes();
+  }, [fetchNotes]);
+
+  // Trigger auto-enrich when notes loaded and autoEnrich param present
+  useEffect(() => {
+    const shouldAutoEnrich = searchParams.get("autoEnrich") === "true";
+    if (
+      !shouldAutoEnrich ||
+      notes.length === 0 ||
+      loading ||
+      autoEnrichTriggered.current
+    )
+      return;
+
+    autoEnrichTriggered.current = true;
+
+    // Remove autoEnrich param from URL to prevent re-trigger on refresh
+    const url = new URL(window.location.href);
+    url.searchParams.delete("autoEnrich");
+    window.history.replaceState({}, "", url.toString());
+
+    runAutoEnrichPipeline(notes);
+  }, [notes, loading, searchParams, runAutoEnrichPipeline]);
+
   // Count cards with empty text fields
   const cardsWithEmptyText = notes.filter((note) => {
     const info = getEnrichableFields(note);
@@ -809,6 +1030,36 @@ function EnrichContent() {
           <span className="text-xs text-muted-foreground">{batchProgress}</span>
         )}
       </div>
+
+      {/* Auto-enrich progress banner */}
+      {autoEnrichPhase && (
+        <div className={cn(
+          "rounded-lg border p-4 text-sm",
+          autoEnrichPhase === "Done! All cards enriched."
+            ? "border-success/50 bg-success/5 text-success"
+            : autoEnrichPhase.startsWith("Done!")
+              ? "border-warning/50 bg-warning/5 text-warning"
+              : autoEnrichPhase.includes("failed")
+                ? "border-destructive/50 bg-destructive/5 text-destructive"
+                : "border-primary/50 bg-primary/5 text-primary"
+        )}>
+          <div className="flex items-center gap-2">
+            {!autoEnrichPhase.startsWith("Done") && !autoEnrichPhase.includes("failed") && (
+              <LoadingSpinner size="sm" />
+            )}
+            {autoEnrichPhase.startsWith("Done") && (
+              <Check className="h-4 w-4" />
+            )}
+            {autoEnrichPhase.includes("failed") && !autoEnrichPhase.startsWith("Done") && (
+              <AlertCircle className="h-4 w-4" />
+            )}
+            <span className="font-medium">{autoEnrichPhase}</span>
+          </div>
+          {batchProgress && !autoEnrichPhase.startsWith("Done") && (
+            <p className="mt-1 text-xs opacity-70">{batchProgress}</p>
+          )}
+        </div>
+      )}
 
       {notes.map((note) => (
         <EnrichCard
