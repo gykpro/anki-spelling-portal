@@ -6,6 +6,25 @@ import type { CreateNoteParams } from "@/types/anki";
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
+
+    // Duplicate check mode: return which words already exist in the deck
+    const checkDuplicates = searchParams.get("checkDuplicates");
+    if (checkDuplicates) {
+      const inputWords = checkDuplicates.split(",").map((w) => w.trim()).filter(Boolean);
+      const allNoteIds = await ankiConnect.findNotes('deck:"Gao English Spelling"');
+      const existingWords = new Set<string>();
+      if (allNoteIds.length > 0) {
+        const allNotes = await ankiConnect.notesInfo(allNoteIds);
+        for (const note of allNotes) {
+          const word = note.fields?.Word?.value;
+          if (word) existingWords.add(word.toLowerCase());
+        }
+      }
+      const duplicates = inputWords.filter((w) => existingWords.has(w.toLowerCase()));
+      const newWords = inputWords.filter((w) => !existingWords.has(w.toLowerCase()));
+      return NextResponse.json({ duplicates, newWords });
+    }
+
     const query = searchParams.get("q") || 'deck:"Gao English Spelling"';
     const limit = parseInt(searchParams.get("limit") || "100", 10);
 

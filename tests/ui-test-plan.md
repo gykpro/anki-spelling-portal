@@ -40,12 +40,33 @@ Pre-requisites: Anki running with AnkiConnect, dev server on localhost:3000.
 - Clear textarea completely
 - Verify submit button is disabled or shows "Add 0 words"
 
-### 2c. Duplicate words
+### 2c. Duplicate detection — mixed input
 - Navigate to `/quick-add`
-- Enter a word that already exists in Anki (pick one from Browse)
-- Submit, observe behavior (should show error or duplicate warning)
+- Enter `__test_dup_alpha`, `__test_dup_beta` and submit to create them first
+- Click "Add More", enter `__test_dup_alpha`, `__test_dup_beta`, `__test_dup_gamma`
+- Click submit — verify "Checking..." state appears briefly
+- Verify duplicate warning panel appears with amber background
+- Verify `__test_dup_alpha` and `__test_dup_beta` shown with "(exists — skipped)" and line-through
+- Verify `__test_dup_gamma` shown as a normal chip (no strikethrough)
+- Verify button says "Add 1 word to Anki"
+- Click a duplicate chip to un-skip it — verify it changes to "(exists — will add)" and button updates to "Add 2 words"
+- Click the duplicate chip again to re-skip it
+- Click "Add 1 word to Anki"
+- Verify success: 1 card created, 2 duplicates skipped
 
-### 2d. Special characters
+### 2d. Duplicate detection — all duplicates
+- Navigate to `/quick-add`
+- Enter only `__test_dup_alpha` (already exists from 2c)
+- Submit — verify warning shows all as duplicates
+- Verify button says "Add 0 words to Anki" and is disabled
+- Click Cancel to return to input
+
+### 2e. Duplicate detection — no duplicates
+- Navigate to `/quick-add`
+- Enter only `__test_dup_delta` (new word)
+- Submit — verify no warning panel, proceeds directly to success
+
+### 2f. Special characters
 - Enter words with special chars: `__test_it's`, `__test_re-enter`
 - Submit, verify they create successfully
 
@@ -208,11 +229,17 @@ Pre-requisites: Anki running with AnkiConnect, dev server on localhost:3000.
 - Verify extracted sentences appear in editable list
 - Verify term/week and topic extracted correctly
 
-### 5d. Edit extracted data
+### 5d. Duplicate flagging in review
+- After extracting (5c), check if any extracted words already exist in Anki
+- Verify duplicate cards show amber border and "duplicate" badge next to the word
+- Verify non-duplicate cards have normal styling
+- Verify user can remove duplicate cards with the trash button
+
+### 5e. Edit extracted data
 - Modify a word or sentence inline
 - Verify edit persists in the review list
 
-### 5e. Submit to Anki
+### 5f. Submit to Anki
 - Submit extracted cards
 - Verify success message with card count
 - Go to Browse, verify new cards appear

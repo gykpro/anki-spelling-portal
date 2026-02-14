@@ -69,6 +69,27 @@ export function useExtraction() {
         }
       }
 
+      // Check for duplicates (non-blocking)
+      try {
+        const wordList = cards.map((c) => c.word).join(",");
+        const dupRes = await fetch(
+          `/api/anki/notes?checkDuplicates=${encodeURIComponent(wordList)}`
+        );
+        if (dupRes.ok) {
+          const dupData = await dupRes.json();
+          const dupSet = new Set(
+            (dupData.duplicates as string[]).map((w) => w.toLowerCase())
+          );
+          for (const card of cards) {
+            if (dupSet.has(card.word.toLowerCase())) {
+              card.isDuplicate = true;
+            }
+          }
+        }
+      } catch {
+        // Duplicate check failed — skip silently
+      }
+
       setState((s) => ({
         ...s,
         step: "review",

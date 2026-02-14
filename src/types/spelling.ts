@@ -35,6 +35,8 @@ export interface SpellingCard {
   topic: string;
   /** Whether this card has been edited by the user */
   edited: boolean;
+  /** Whether this word already exists in Anki */
+  isDuplicate?: boolean;
 }
 
 export interface UploadSession {

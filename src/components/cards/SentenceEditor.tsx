@@ -37,7 +37,11 @@ export function SentenceEditor({
     <div
       className={cn(
         "rounded-lg border p-4 transition-colors",
-        card.edited ? "border-warning/50 bg-warning/5" : "border-border"
+        card.isDuplicate
+          ? "border-amber-400/50 bg-amber-50/50"
+          : card.edited
+            ? "border-warning/50 bg-warning/5"
+            : "border-border"
       )}
     >
       <div className="flex items-start justify-between gap-2">
@@ -95,6 +99,11 @@ export function SentenceEditor({
                 <span className="inline-flex items-center rounded bg-accent px-2 py-0.5 text-xs font-medium text-accent-foreground">
                   {card.word}
                 </span>
+                {card.isDuplicate && (
+                  <span className="inline-flex items-center rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-700">
+                    duplicate
+                  </span>
+                )}
                 {card.edited && (
                   <span className="text-xs text-warning">edited</span>
                 )}
