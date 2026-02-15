@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { runClaudeJSON } from "@/lib/claude-cli";
+import { runAnthropicJSON } from "@/lib/anthropic";
 import {
   type TextEnrichField,
   getFieldDescriptions,
@@ -120,9 +120,7 @@ export async function POST(request: NextRequest) {
     // Generate text fields via Claude Code CLI (stdin piped)
     if (textFields.length > 0) {
       const prompt = buildPrompt(word, sentence, textFields);
-      const parsed = await runClaudeJSON<Record<string, unknown>>(prompt, {
-        timeout: 60_000,
-      });
+      const parsed = await runAnthropicJSON<Record<string, unknown>>(prompt);
       Object.assign(results, parsed);
     }
 

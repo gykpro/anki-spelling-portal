@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { runClaude } from "@/lib/claude-cli";
+import { runAnthropic } from "@/lib/anthropic";
 import {
   type TextEnrichField,
   getFieldDescriptions,
@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
       const prompt = buildBatchPrompt(chunk, fields);
 
       try {
-        const rawText = await runClaude(prompt, { timeout: 120_000 });
+        const rawText = await runAnthropic(prompt);
         const parsed = extractJsonArray(rawText);
 
         // Match results back to cards by index (primary) or word (fallback)

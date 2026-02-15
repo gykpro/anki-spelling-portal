@@ -166,7 +166,7 @@ Pre-requisites: Anki running with AnkiConnect, dev server on localhost:3000.
 - Verify Image and Sentence Audio show "Needs sentence" and are grayed out
 - Verify "Select all empty" button present
 
-### 4c. Generate text fields (critical — tests Claude CLI)
+### 4c. Generate text fields (critical — tests Anthropic SDK)
 - On `__test_apple`, click "Select all empty"
 - Verify 6 fields selected (not Image or Sentence Audio)
 - Click "Generate", verify spinner appears
@@ -328,7 +328,7 @@ After all tests:
 ## Notes
 
 - Test words use `__test_` prefix for easy identification and cleanup
-- Claude CLI generation takes 15-30s per card (single) or 15-30s total (batch) — budget time accordingly
+- Anthropic API generation takes 5-15s per card (single) or 10-20s total (batch) — budget time accordingly
 - Image generation via Gemini takes 10-20s
 - If a step fails, screenshot the error state and note it before continuing
 - Skip section 1b if Anki cannot be stopped during testing

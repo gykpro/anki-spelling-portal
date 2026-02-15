@@ -1,0 +1,13 @@
+node_modules
+.next
+.git
+.gitignore
+.env*.local
+.uploads
+.extractions
+*.md
+docs
+tests
+private
+.claude
+.DS_Store

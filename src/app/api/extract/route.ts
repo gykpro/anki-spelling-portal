@@ -1,11 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { writeFile, mkdir } from "fs/promises";
-import { join } from "path";
-import { runClaudeJSON } from "@/lib/claude-cli";
+import { runAnthropicVision } from "@/lib/anthropic";
 
-const UPLOAD_DIR = join(process.cwd(), ".uploads");
-
-const EXTRACTION_PROMPT = `You are extracting spelling worksheet data. For each image file listed below, read it and extract the data.
+const EXTRACTION_PROMPT = `You are extracting spelling worksheet data from the provided images.
 
 Return ONLY a JSON array (no markdown, no code fences) with this structure:
 [
@@ -25,11 +21,24 @@ Rules:
 3. For each numbered sentence (1-10), copy it EXACTLY and identify the bold/underlined word or phrase
 4. The underlined text may be a single word or a multi-word phrase - extract the ENTIRE underlined portion
 5. Return ONLY valid JSON, nothing else
-
-Now read these image files and extract the data:
 `;
 
-/** POST: Upload images and extract via Claude Code CLI */
+function getMediaType(filename: string): "image/png" | "image/jpeg" | "image/gif" | "image/webp" {
+  const ext = filename.split(".").pop()?.toLowerCase();
+  switch (ext) {
+    case "jpg":
+    case "jpeg":
+      return "image/jpeg";
+    case "gif":
+      return "image/gif";
+    case "webp":
+      return "image/webp";
+    default:
+      return "image/png";
+  }
+}
+
+/** POST: Upload images and extract via Anthropic Vision API */
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
@@ -42,31 +51,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Save files to disk
-    const sessionId = `session_${Date.now()}`;
-    const sessionDir = join(UPLOAD_DIR, sessionId);
-    await mkdir(sessionDir, { recursive: true });
-
-    const filePaths: string[] = [];
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
+    // Convert files to base64 for vision API
+    const images: { base64: string; mediaType: "image/png" | "image/jpeg" | "image/gif" | "image/webp" }[] = [];
+    for (const file of files) {
       const buffer = Buffer.from(await file.arrayBuffer());
-      const ext = file.name.split(".").pop() || "png";
-      const filename = `page_${i + 1}.${ext}`;
-      const filePath = join(sessionDir, filename);
-      await writeFile(filePath, buffer);
-      filePaths.push(filePath);
+      images.push({
+        base64: buffer.toString("base64"),
+        mediaType: getMediaType(file.name),
+      });
     }
 
-    // Build prompt with file paths
-    const fileList = filePaths.map((p) => `- ${p}`).join("\n");
-    const prompt = EXTRACTION_PROMPT + fileList;
-
-    // Invoke Claude Code CLI via stdin pipe
-    const pages = await runClaudeJSON(prompt, {
-      timeout: 120_000,
-      allowedTools: ["Read"],
-    });
+    // Send images directly to Anthropic Vision API
+    const pages = await runAnthropicVision(EXTRACTION_PROMPT, images);
 
     return NextResponse.json({ pages });
   } catch (error) {

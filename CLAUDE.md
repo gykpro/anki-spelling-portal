@@ -38,7 +38,8 @@ Follow this order for every feature request or change:
 
 ## Tech Stack Reminders
 
-- Claude CLI via stdin pipe (`src/lib/claude-cli.ts`) — never pass prompts as CLI args
-- No `@anthropic-ai/sdk` — all AI goes through `claude` CLI (Max subscription)
+- Anthropic SDK (`@anthropic-ai/sdk`) via `src/lib/anthropic.ts` for all AI calls (enrichment, extraction)
 - Anki is source of truth — no database
 - Image generation via Gemini API directly (not through Claude)
+- Audio generation via Azure TTS
+- Deployable via Docker (see `docs/nas-setup.md`)
