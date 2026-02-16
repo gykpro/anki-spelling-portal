@@ -3,7 +3,37 @@
 Follow this plan via Chrome browser automation. Improvise at each step based on
 what you actually see on screen. Create test data, verify, then clean up.
 
-Pre-requisites: Anki running with AnkiConnect, dev server on localhost:3000.
+## Test Setup
+
+### Pre-requisites
+1. **Anki** running with AnkiConnect plugin on `localhost:8765`
+2. **Dev server** running on `localhost:3000` (`npm run dev`)
+3. **Chrome browser** with Claude extension connected for browser automation
+
+### Environment Setup
+Before running tests, the following must be configured (via `/settings` page or `.env.local`):
+
+| Service | Env Variable | Required For | How to Get |
+|---------|-------------|--------------|------------|
+| AnkiConnect | `ANKI_CONNECT_URL` | Sections 1-6 (all card operations) | Default `localhost:8765`, just have Anki open |
+| Anthropic API | `ANTHROPIC_API_KEY` | Sections 4c-4n (text enrichment) | [console.anthropic.com](https://console.anthropic.com) |
+| Azure TTS | `AZURE_TTS_KEY` + `AZURE_TTS_REGION` | Sections 4i, 4j, 4o (audio generation) | Azure Portal > Cognitive Services > Speech |
+| Gemini API | `NANO_BANANA_API_KEY` | Sections 4e, 4p (image generation) | [aistudio.google.com](https://aistudio.google.com) |
+
+### Setup Steps
+1. Start Anki desktop app (ensure AnkiConnect plugin is installed)
+2. Run `npm run dev` in the project root
+3. Navigate to `http://localhost:3000/settings`
+4. Enter the required API keys for the sections you plan to test
+5. Click "Save Changes" and verify keys show as "Configured (from file)"
+6. Start testing from Section 1
+
+### What Can Be Tested Without API Keys
+- **Section 1** (Dashboard) — only needs Anki running
+- **Section 2** (Quick Add) — only needs Anki running
+- **Section 3** (Browse) — only needs Anki running
+- **Section 5** (Upload) — needs Anthropic API key for extraction
+- **Section 7** (Settings) — no external services needed at all
 
 ---
 
