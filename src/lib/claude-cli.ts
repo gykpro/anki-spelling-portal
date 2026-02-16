@@ -1,4 +1,5 @@
 import { spawn } from "child_process";
+import { getConfig } from "./settings";
 
 /**
  * Invoke the Claude Code CLI with a prompt piped via stdin.
@@ -24,8 +25,14 @@ export function runClaude(prompt: string, options?: {
       args.push("--allowed-tools", ...allowedTools);
     }
 
+    const spawnEnv: NodeJS.ProcessEnv = { ...process.env, FORCE_COLOR: "0" };
+    const oauthToken = getConfig("CLAUDE_CODE_OAUTH_TOKEN");
+    if (oauthToken) {
+      spawnEnv["CLAUDE_CODE_OAUTH_TOKEN"] = oauthToken;
+    }
+
     const child = spawn("claude", args, {
-      env: { ...process.env, FORCE_COLOR: "0" },
+      env: spawnEnv,
       stdio: ["pipe", "pipe", "pipe"],
     });
 

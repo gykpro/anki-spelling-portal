@@ -1,11 +1,12 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { getConfig } from "./settings";
 
 const MODEL = "claude-sonnet-4-5-20250929";
 
 function getClient(): Anthropic {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = getConfig("ANTHROPIC_API_KEY");
   if (!apiKey) {
-    throw new Error("ANTHROPIC_API_KEY environment variable is not set");
+    throw new Error("ANTHROPIC_API_KEY is not configured. Add it in Settings.");
   }
   return new Anthropic({ apiKey });
 }

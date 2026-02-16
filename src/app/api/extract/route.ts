@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { runAnthropicVision } from "@/lib/anthropic";
+import { runAIVision } from "@/lib/ai";
 
 const EXTRACTION_PROMPT = `You are extracting spelling worksheet data from the provided images.
 
@@ -61,8 +61,8 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Send images directly to Anthropic Vision API
-    const pages = await runAnthropicVision(EXTRACTION_PROMPT, images);
+    // Send images to AI backend (vision requires SDK)
+    const pages = await runAIVision(EXTRACTION_PROMPT, images);
 
     return NextResponse.json({ pages });
   } catch (error) {

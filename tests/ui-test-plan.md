@@ -325,6 +325,58 @@ After all tests:
 
 ---
 
+## 7. Settings
+
+### 7a. Page load
+- Navigate to `/settings`
+- Verify page loads with three sections: "AI Backend", "API Keys", "Configuration"
+- Verify "Save Changes" button is disabled (no changes yet)
+- Verify sidebar shows "Settings" link with gear icon
+
+### 7b. AI Backend section
+- Verify three backend mode buttons: Auto, SDK, CLI
+- Verify one is selected (highlighted with border)
+- Verify "Active backend" badge shows current status (SDK/CLI/Not configured)
+- Click a different backend mode — verify "Save Changes" enables
+- Click "Save Changes" — verify save succeeds, badge may update
+
+### 7c. View config status
+- Verify each API key field shows status badge: "Configured" (green) or "Not set" (gray)
+- Verify configured keys show source: "from file", "from env", or "default"
+- Verify secret fields show masked value (e.g., "sk-a...1234") beneath input
+- Verify non-secret fields (AZURE_TTS_REGION, ANKI_CONNECT_URL) show full current value
+
+### 7d. Set a non-secret value
+- In "Configuration" section, type `australiaeast` in AZURE_TTS_REGION field
+- Verify "Save Changes" button enables
+- Click "Save Changes" — verify "Saved" confirmation appears
+- Reload page — verify AZURE_TTS_REGION shows "Configured (from file)"
+
+### 7e. Set a secret value
+- Type a test value in ANTHROPIC_API_KEY field (e.g., "sk-ant-test1234567890abcdef")
+- Click "Save Changes" — verify save succeeds
+- Verify status changes to "Configured (from file)"
+- Verify masked value shows (e.g., "sk-a...cdef")
+- Verify the input field is cleared (does not show the full key)
+
+### 7f. Clear a stored value
+- On a configured field, click the "Clear" button
+- Verify field shows "Will remove stored value on save" warning in red
+- Click "Save Changes" — verify value is cleared
+- Verify status falls back to env var or "Not set"
+
+### 7g. Eye toggle for secrets
+- On a secret field, verify input type is "password" (dots shown)
+- Click the eye icon — verify input switches to text (visible)
+- Click again — verify it switches back to password
+
+### 7h. Navigation integration
+- Click "Settings" in sidebar — verify navigation works
+- Click other sidebar links — verify they still work
+- Return to Settings — verify state persists (saved values still shown)
+
+---
+
 ## Notes
 
 - Test words use `__test_` prefix for easy identification and cleanup

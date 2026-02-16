@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { runAnthropicJSON } from "@/lib/anthropic";
+import { runAIJSON } from "@/lib/ai";
+import { getConfig } from "@/lib/settings";
 import {
   type TextEnrichField,
   getFieldDescriptions,
@@ -63,8 +64,8 @@ async function generateTTS(
   text: string,
   type: "word" | "sentence"
 ): Promise<{ base64: string; format: string }> {
-  const key = process.env.AZURE_TTS_KEY;
-  const region = process.env.AZURE_TTS_REGION;
+  const key = getConfig("AZURE_TTS_KEY");
+  const region = getConfig("AZURE_TTS_REGION");
   if (!key || !region) throw new Error("Azure TTS credentials not configured");
 
   const rate = type === "word" ? "-10%" : "0%";
@@ -117,10 +118,10 @@ export async function POST(request: NextRequest) {
 
     const results: Record<string, unknown> = { noteId, word };
 
-    // Generate text fields via Claude Code CLI (stdin piped)
+    // Generate text fields via AI backend
     if (textFields.length > 0) {
       const prompt = buildPrompt(word, sentence, textFields);
-      const parsed = await runAnthropicJSON<Record<string, unknown>>(prompt);
+      const parsed = await runAIJSON<Record<string, unknown>>(prompt);
       Object.assign(results, parsed);
     }
 
@@ -188,7 +189,7 @@ async function generateImage(
   word: string,
   sentence: string
 ): Promise<{ base64: string; mimeType: string }> {
-  const apiKey = process.env.NANO_BANANA_API_KEY;
+  const apiKey = getConfig("NANO_BANANA_API_KEY");
   if (!apiKey) throw new Error("NANO_BANANA_API_KEY not configured");
 
   const prompt = `Create a simple, clear cartoon illustration for a children's vocabulary flashcard.

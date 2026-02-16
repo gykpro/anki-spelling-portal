@@ -42,3 +42,6 @@ next-env.d.ts
 # upload/extraction working dirs
 .uploads/
 .extractions/
+
+# settings data (contains secrets)
+/data/

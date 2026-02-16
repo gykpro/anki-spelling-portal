@@ -7,6 +7,7 @@ import {
   Library,
   Sparkles,
   PenLine,
+  Settings,
 } from "lucide-react";
 
 export const metadata: Metadata = {
@@ -20,6 +21,7 @@ const navItems = [
   { href: "/quick-add", label: "Quick Add", icon: PenLine },
   { href: "/browse", label: "Browse", icon: Library },
   { href: "/enrich", label: "Enrich", icon: Sparkles },
+  { href: "/settings", label: "Settings", icon: Settings },
 ];
 
 export default function RootLayout({

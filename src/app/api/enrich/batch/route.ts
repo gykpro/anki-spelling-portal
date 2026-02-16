@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { runAnthropic } from "@/lib/anthropic";
+import { runAI } from "@/lib/ai";
 import {
   type TextEnrichField,
   getFieldDescriptions,
@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
       const prompt = buildBatchPrompt(chunk, fields);
 
       try {
-        const rawText = await runAnthropic(prompt);
+        const rawText = await runAI(prompt);
         const parsed = extractJsonArray(rawText);
 
         // Match results back to cards by index (primary) or word (fallback)

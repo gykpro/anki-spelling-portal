@@ -5,16 +5,15 @@ import type {
   CreateNoteParams,
   UpdateNoteParams,
 } from "@/types/anki";
-
-const ANKI_CONNECT_URL =
-  process.env.ANKI_CONNECT_URL || "http://localhost:8765";
+import { getConfig } from "./settings";
 
 async function invoke<T = unknown>(
   action: string,
   params?: Record<string, unknown>
 ): Promise<T> {
+  const url = getConfig("ANKI_CONNECT_URL");
   const body: AnkiConnectRequest = { action, version: 6, params };
-  const res = await fetch(ANKI_CONNECT_URL, {
+  const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
