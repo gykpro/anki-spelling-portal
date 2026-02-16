@@ -16,23 +16,28 @@ Before running tests, the following must be configured (via `/settings` page or 
 | Service | Env Variable | Required For | How to Get |
 |---------|-------------|--------------|------------|
 | AnkiConnect | `ANKI_CONNECT_URL` | Sections 1-6 (all card operations) | Default `localhost:8765`, just have Anki open |
-| Anthropic API | `ANTHROPIC_API_KEY` | Sections 4c-4n (text enrichment) | [console.anthropic.com](https://console.anthropic.com) |
+| AI Backend (option A) | `ANTHROPIC_API_KEY` | Sections 4, 5 (enrichment, extraction) | [console.anthropic.com](https://console.anthropic.com) — pay-per-use |
+| AI Backend (option B) | `CLAUDE_CODE_OAUTH_TOKEN` | Sections 4 (text enrichment only) | Run `claude setup-token` on host — free with Max subscription |
 | Azure TTS | `AZURE_TTS_KEY` + `AZURE_TTS_REGION` | Sections 4i, 4j, 4o (audio generation) | Azure Portal > Cognitive Services > Speech |
 | Gemini API | `NANO_BANANA_API_KEY` | Sections 4e, 4p (image generation) | [aistudio.google.com](https://aistudio.google.com) |
+
+**AI Backend notes:** You need either option A (SDK) or option B (CLI), not both. SDK supports all features including vision extraction. CLI supports text enrichment only (vision/extraction still requires SDK). Configure via Settings page > AI Backend section.
 
 ### Setup Steps
 1. Start Anki desktop app (ensure AnkiConnect plugin is installed)
 2. Run `npm run dev` in the project root
 3. Navigate to `http://localhost:3000/settings`
-4. Enter the required API keys for the sections you plan to test
-5. Click "Save Changes" and verify keys show as "Configured (from file)"
-6. Start testing from Section 1
+4. Choose your AI backend (Auto/SDK/CLI) and enter the corresponding key
+5. Enter other API keys for the sections you plan to test
+6. Click "Save Changes" and verify keys show as "Configured (from file)"
+7. Verify the "Active backend" badge shows SDK or CLI (not "Not configured")
+8. Start testing from Section 1
 
 ### What Can Be Tested Without API Keys
 - **Section 1** (Dashboard) — only needs Anki running
 - **Section 2** (Quick Add) — only needs Anki running
 - **Section 3** (Browse) — only needs Anki running
-- **Section 5** (Upload) — needs Anthropic API key for extraction
+- **Section 5** (Upload) — needs AI backend for extraction (SDK only — vision not supported in CLI)
 - **Section 7** (Settings) — no external services needed at all
 
 ---
