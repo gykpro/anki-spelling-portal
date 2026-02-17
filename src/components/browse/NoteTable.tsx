@@ -5,7 +5,7 @@ import { ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
 import type { AnkiNote } from "@/types/anki";
 import { cn } from "@/lib/utils";
 
-type SortField = "word" | "sentence" | "definition" | "audio" | "image" | "tags";
+type SortField = "word" | "sentence" | "definition" | "audio" | "image" | "tags" | "created" | "modified";
 type SortDir = "asc" | "desc";
 
 interface NoteTableProps {
@@ -25,6 +25,24 @@ function getFieldValue(note: AnkiNote, field: string): string {
 
 function stripHtml(html: string): string {
   return html.replace(/<[^>]*>/g, "");
+}
+
+function formatDate(ts: number): string {
+  const date = new Date(ts);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffDays === 0) return "Today";
+  if (diffDays === 1) return "Yesterday";
+  if (diffDays < 7) return `${diffDays}d ago`;
+  if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
+
+  return date.toLocaleDateString("en-AU", {
+    day: "numeric",
+    month: "short",
+    year: date.getFullYear() !== now.getFullYear() ? "numeric" : undefined,
+  });
 }
 
 function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
@@ -89,6 +107,16 @@ export function NoteTable({
           va = a.tags.join(",").toLowerCase();
           vb = b.tags.join(",").toLowerCase();
           break;
+        case "created": {
+          const ca = a.noteId;
+          const cb = b.noteId;
+          return sortDir === "asc" ? ca - cb : cb - ca;
+        }
+        case "modified": {
+          const ma = a.mod || 0;
+          const mb = b.mod || 0;
+          return sortDir === "asc" ? ma - mb : mb - ma;
+        }
       }
       const cmp = va.localeCompare(vb);
       return sortDir === "asc" ? cmp : -cmp;
@@ -113,8 +141,10 @@ export function NoteTable({
     { field: "word", label: "Word" },
     { field: "sentence", label: "Sentence" },
     { field: "definition", label: "Definition" },
-    { field: "audio", label: "Audio", center: true, width: "w-20" },
-    { field: "image", label: "Image", center: true, width: "w-20" },
+    { field: "audio", label: "Audio", center: true, width: "w-16" },
+    { field: "image", label: "Image", center: true, width: "w-16" },
+    { field: "created", label: "Created", width: "w-24" },
+    { field: "modified", label: "Modified", width: "w-24" },
     { field: "tags", label: "Tags" },
   ];
 
@@ -204,6 +234,12 @@ export function NoteTable({
                         hasImage ? "bg-success" : "bg-border"
                       )}
                     />
+                  </td>
+                  <td className="p-3 text-xs text-muted-foreground whitespace-nowrap" title={new Date(note.noteId).toLocaleString()}>
+                    {formatDate(note.noteId)}
+                  </td>
+                  <td className="p-3 text-xs text-muted-foreground whitespace-nowrap" title={note.mod ? new Date(note.mod * 1000).toLocaleString() : ""}>
+                    {note.mod ? formatDate(note.mod * 1000) : "—"}
                   </td>
                   <td className="p-3">
                     <div className="flex flex-wrap gap-1">

@@ -19,6 +19,8 @@ export interface AnkiNote {
   modelName: string;
   fields: Record<string, { value: string; order: number }>;
   tags: string[];
+  /** Modification timestamp (seconds since epoch) */
+  mod?: number;
 }
 
 export interface AnkiConnectRequest {
