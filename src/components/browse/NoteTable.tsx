@@ -59,7 +59,8 @@ export function NoteTable({
   };
 
   const sorted = useMemo(() => {
-    if (!sortField) return notes;
+    // Default sort: newest first (by noteId, which is a timestamp)
+    if (!sortField) return [...notes].sort((a, b) => b.noteId - a.noteId);
     return [...notes].sort((a, b) => {
       let va = "";
       let vb = "";
