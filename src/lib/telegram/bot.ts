@@ -74,6 +74,19 @@ export async function startTelegramBot(): Promise<void> {
   });
 
   globalForBot.__telegramBot = bot;
+
+  // Validate token by calling getMe before starting polling
+  try {
+    const me = await bot.api.getMe();
+    console.log(`[Telegram] Bot authenticated as @${me.username}`);
+  } catch (err) {
+    console.error(
+      `[Telegram] Invalid bot token: ${err instanceof Error ? err.message : String(err)}`
+    );
+    globalForBot.__telegramBot = undefined;
+    return;
+  }
+
   globalForBot.__telegramBotRunning = true;
 
   // Start long-polling (non-blocking)
@@ -82,6 +95,9 @@ export async function startTelegramBot(): Promise<void> {
     onStart: () => {
       console.log("[Telegram] Bot started (long-polling)");
     },
+  }).catch((err) => {
+    console.error(`[Telegram] Polling error: ${err instanceof Error ? err.message : String(err)}`);
+    globalForBot.__telegramBotRunning = false;
   });
 
   // Handle graceful shutdown

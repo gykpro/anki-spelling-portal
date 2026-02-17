@@ -12,6 +12,9 @@ export function detectIntent(text: string): Intent {
   const trimmed = text.trim();
   if (!trimmed) return { type: "unknown" };
 
+  // Ignore commands (handled separately by bot.command())
+  if (trimmed.startsWith("/")) return { type: "unknown" };
+
   // Split by newlines, commas, or semicolons
   const parts = trimmed
     .split(/[\n,;]+/)

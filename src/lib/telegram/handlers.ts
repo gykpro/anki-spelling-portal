@@ -35,20 +35,32 @@ function formatResult(result: {
   return lines.join("\n");
 }
 
+const USAGE_TEXT =
+  "Send me words to add to Anki:\n" +
+  "- Single word or phrase\n" +
+  "- Multiple words (one per line, or comma-separated)\n" +
+  "- A photo of a spelling worksheet";
+
 export function registerHandlers(bot: Bot): void {
+  // Handle /start and /help commands
+  bot.command("start", async (ctx) => {
+    await ctx.reply(
+      "Hi! I'm your Anki spelling bot.\n\n" + USAGE_TEXT,
+      { parse_mode: "HTML" }
+    );
+  });
+
+  bot.command("help", async (ctx) => {
+    await ctx.reply(USAGE_TEXT, { parse_mode: "HTML" });
+  });
+
   // Handle text messages
   bot.on("message:text", async (ctx) => {
     const text = ctx.message.text;
     const intent = detectIntent(text);
 
     if (intent.type === "unknown") {
-      await ctx.reply(
-        "Send me words to add to Anki:\n" +
-          "- Single word or phrase\n" +
-          "- Multiple words (one per line, or comma-separated)\n" +
-          "- A photo of a spelling worksheet",
-        { parse_mode: "HTML" }
-      );
+      await ctx.reply(USAGE_TEXT, { parse_mode: "HTML" });
       return;
     }
 

@@ -36,10 +36,25 @@ This starts:
 
 ### 2. Configure API keys
 
-Visit `http://<nas-ip>:3000/settings` in your browser and enter your API keys:
-- **Anthropic API Key** — for AI enrichment (extraction + text generation)
-- **Azure TTS Key + Region** — for audio generation
-- **Gemini API Key** — for image generation
+Visit `http://<nas-ip>:3000/settings` in your browser and enter your keys.
+
+#### AI Backend (choose one)
+
+You need one of these for text enrichment and worksheet extraction:
+
+| Option | Key | Cost | Vision support | How to get |
+|--------|-----|------|---------------|------------|
+| **SDK** (recommended) | `ANTHROPIC_API_KEY` | Pay-per-use | Yes | [console.anthropic.com](https://console.anthropic.com) → API Keys |
+| **CLI** | `CLAUDE_CODE_OAUTH_TOKEN` | Free (Max subscription) | No (text only) | Run `claude setup-token` on your local machine, copy the token |
+
+Set **Backend Mode** to "Auto" (default) to use SDK if available, else fall back to CLI.
+
+> **Note:** The CLI option requires a Claude Max subscription ($100/month or $200/month). It uses the Claude Code CLI protocol — run `claude setup-token` on any machine with Claude Code installed, then paste the resulting token into the Settings page. Vision/extraction features (worksheet photos) require the SDK option.
+
+#### Other services
+
+- **Azure TTS Key + Region** — for audio generation ([Azure Portal](https://portal.azure.com) → Cognitive Services → Speech)
+- **Gemini API Key** — for image generation ([aistudio.google.com](https://aistudio.google.com))
 - **Telegram Bot Token** — for Telegram bot (see [telegram-setup.md](telegram-setup.md))
 - **Telegram Allowed Users** — comma-separated user IDs (optional)
 
