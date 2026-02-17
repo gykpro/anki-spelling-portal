@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { runAI } from "@/lib/ai";
+import { ankiConnect } from "@/lib/anki-connect";
 import { extractJsonArray, buildBatchPrompt } from "@/lib/enrichment-pipeline";
 import type {
   BatchEnrichRequest,
@@ -20,6 +21,8 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    await ankiConnect.syncBeforeWrite();
 
     // Process in chunks of MAX_BATCH_SIZE
     const allResults: BatchEnrichResultItem[] = [];

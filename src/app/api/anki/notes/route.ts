@@ -66,6 +66,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Sync before writing
+    await ankiConnect.syncBeforeWrite();
+
     // Ensure deck exists
     await ankiConnect.createDeck(notes[0].deckName);
 

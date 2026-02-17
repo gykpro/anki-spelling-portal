@@ -399,7 +399,8 @@ export async function runFullPipeline(
     `${dupes.size} duplicate(s) skipped. Creating ${newWords.length} notes...`
   );
 
-  // 2. Create notes
+  // 2. Sync and create notes
+  await ankiConnect.syncBeforeWrite();
   const created = await createWordNotes(newWords);
   if (created.length === 0) {
     return { created: 0, duplicates: dupes.size, errors: ["Failed to create any notes"] };
@@ -504,7 +505,8 @@ export async function runFullPipelineFromExtraction(
     `${dupes.size} duplicate(s) skipped. Creating ${newItems.length} notes...`
   );
 
-  // 2. Create notes (with proper sentence/cloze from worksheet)
+  // 2. Sync and create notes (with proper sentence/cloze from worksheet)
+  await ankiConnect.syncBeforeWrite();
   const cards: SpellingCard[] = newItems.map((item) => ({
     id: `tg_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
     word: item.word,

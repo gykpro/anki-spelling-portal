@@ -143,4 +143,13 @@ export const ankiConnect = {
   async sync(): Promise<void> {
     await invoke("sync");
   },
+
+  /** Sync before write — non-blocking, logs warning on failure */
+  async syncBeforeWrite(): Promise<void> {
+    try {
+      await invoke("sync");
+    } catch (err) {
+      console.warn("[AnkiConnect] Sync before write failed (continuing anyway):", err);
+    }
+  },
 };

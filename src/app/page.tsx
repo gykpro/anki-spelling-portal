@@ -9,6 +9,7 @@ import {
   PenLine,
   AlertTriangle,
   CheckCircle2,
+  RefreshCw,
 } from "lucide-react";
 import { useAnkiConnection } from "@/hooks/useAnkiConnection";
 import { StatusBadge } from "@/components/shared/StatusBadge";
@@ -30,6 +31,23 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<DeckStats | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
   const [statsError, setStatsError] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<"success" | "error" | null>(null);
+
+  async function handleSync() {
+    setSyncing(true);
+    setSyncResult(null);
+    try {
+      const res = await fetch("/api/anki/sync", { method: "POST" });
+      if (!res.ok) throw new Error("Sync failed");
+      setSyncResult("success");
+    } catch {
+      setSyncResult("error");
+    } finally {
+      setSyncing(false);
+      setTimeout(() => setSyncResult(null), 3000);
+    }
+  }
 
   useEffect(() => {
     async function fetchStats() {
@@ -64,12 +82,28 @@ export default function DashboardPage() {
       <div className="rounded-lg border border-border p-5">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-semibold">System Status</h3>
-          <button
-            onClick={refresh}
-            className="text-xs text-primary hover:underline"
-          >
-            Refresh
-          </button>
+          <div className="flex items-center gap-3">
+            {syncResult === "success" && (
+              <span className="text-xs text-green-600 dark:text-green-400">Synced</span>
+            )}
+            {syncResult === "error" && (
+              <span className="text-xs text-destructive">Sync failed</span>
+            )}
+            <button
+              onClick={handleSync}
+              disabled={syncing}
+              className="inline-flex items-center gap-1 text-xs text-primary hover:underline disabled:opacity-50"
+            >
+              <RefreshCw className={`h-3 w-3 ${syncing ? "animate-spin" : ""}`} />
+              {syncing ? "Syncing..." : "Sync"}
+            </button>
+            <button
+              onClick={refresh}
+              className="text-xs text-primary hover:underline"
+            >
+              Refresh
+            </button>
+          </div>
         </div>
         {loading ? (
           <div className="mt-4 flex items-center gap-2">

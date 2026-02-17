@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { runAIJSON } from "@/lib/ai";
+import { ankiConnect } from "@/lib/anki-connect";
 import {
   type TextEnrichField,
   getFieldDescriptions,
@@ -62,6 +63,8 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    await ankiConnect.syncBeforeWrite();
 
     const nonTextFields = new Set(["image", "audio", "sentence_audio"]);
     const textFields = fields.filter((f) => !nonTextFields.has(f));

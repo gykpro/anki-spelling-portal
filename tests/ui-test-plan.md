@@ -76,6 +76,22 @@ Before running tests, configure all API keys via the **Settings page** (`/settin
 - If all cards are complete, verify green "All N cards are complete" message with checkmark icon
 - If not all complete, skip this test (cannot easily force all-complete state)
 
+### 1g. Sync button (happy path)
+- Navigate to `/`
+- Verify System Status section has a "Sync" button with a refresh icon next to the "Refresh" link
+- Click "Sync" button
+- Verify spinner animation appears on the icon and text changes to "Syncing..."
+- Wait for sync to complete
+- Verify green "Synced" text appears briefly (fades after 3s)
+- Verify button returns to normal "Sync" state
+
+### 1h. Sync button (error — Anki stopped)
+- Stop Anki (or skip if can't control)
+- Navigate to `/`
+- Click "Sync" button
+- Verify red "Sync failed" text appears
+- Restart Anki
+
 ### 1c. Navigation
 - Click each sidebar link (Dashboard, Upload, Quick Add, Browse, Enrich)
 - Verify each page loads without error

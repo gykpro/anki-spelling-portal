@@ -27,6 +27,7 @@ export async function PUT(
       );
     }
 
+    await ankiConnect.syncBeforeWrite();
     await ankiConnect.updateNoteFields({ id: noteIdNum, fields });
 
     return NextResponse.json({ success: true });
