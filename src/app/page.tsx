@@ -104,7 +104,7 @@ export default function DashboardPage() {
                 status={status.checks.modelExists ? "connected" : "disconnected"}
                 label={
                   status.checks.modelExists
-                    ? "school spelling+"
+                    ? "school spelling"
                     : "Missing"
                 }
               />

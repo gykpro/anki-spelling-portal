@@ -1,4 +1,4 @@
-/** Fields for the "school spelling+" note type */
+/** Fields for the "school spelling" note type */
 export interface SpellingNoteFields {
   Word: string;
   "Main Sentence": string;

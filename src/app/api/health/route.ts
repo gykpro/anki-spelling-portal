@@ -22,7 +22,7 @@ export async function GET() {
     }
 
     const models = await ankiConnect.modelNames();
-    checks.modelExists = models.includes("school spelling+");
+    checks.modelExists = models.includes("school spelling");
   } catch {
     // AnkiConnect not reachable
   }

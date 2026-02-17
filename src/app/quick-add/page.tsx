@@ -73,7 +73,7 @@ export default function QuickAddPage() {
     try {
       const notes = wordsToSubmit.map((word) => ({
         deckName: "Gao English Spelling",
-        modelName: "school spelling+",
+        modelName: "school spelling",
         fields: {
           Word: word,
           "Main Sentence": "",

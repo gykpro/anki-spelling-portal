@@ -2,7 +2,7 @@ import type { ExtractedSentence, SpellingCard } from "@/types/spelling";
 import type { SpellingNoteFields, CreateNoteParams } from "@/types/anki";
 
 const DECK_NAME = "Gao English Spelling";
-const MODEL_NAME = "school spelling+";
+const MODEL_NAME = "school spelling";
 
 /**
  * Build the Main Sentence field: sentence with the word wrapped in
