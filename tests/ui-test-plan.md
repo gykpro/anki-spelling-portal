@@ -412,6 +412,39 @@ After all tests:
 
 ---
 
+## 8. Dev Startup Script
+
+### 8a. Anki auto-launch
+- Close Anki completely
+- Run `npm run dev` in the terminal
+- Verify output shows `Anki: Launched (was not running)`
+- Verify Anki application opens
+- Verify dev server starts normally after 2s delay
+
+### 8b. Anki already running
+- Ensure Anki is running
+- Run `npm run dev`
+- Verify output shows `Anki: Running`
+- Verify dev server starts immediately
+
+### 8c. Config status with keys configured
+- Ensure `.env.local` has Azure and Gemini keys
+- Run `npm run dev`
+- Verify green "Configured" shown for Azure TTS and Gemini
+- Verify AnkiConnect URL shown with source
+
+### 8d. Missing AI backend warning
+- Remove all AI keys from both `.env.local` and `data/secrets.json`
+- Run `npm run dev`
+- Verify red "Not configured" warning for AI Backend
+- Verify dev server still starts (non-blocking)
+
+### 8e. Pass-through args
+- Run `npm run dev -- --port 3001`
+- Verify dev server starts on port 3001
+
+---
+
 ## Notes
 
 - Test words use `__test_` prefix for easy identification and cleanup
