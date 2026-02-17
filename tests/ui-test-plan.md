@@ -20,6 +20,7 @@ Before running tests, configure all API keys via the **Settings page** (`/settin
 | AI Backend (option B) | `CLAUDE_CODE_OAUTH_TOKEN` | Sections 4 (text enrichment only) | Run `claude setup-token` on host — free with Max subscription |
 | Azure TTS | `AZURE_TTS_KEY` + `AZURE_TTS_REGION` | Sections 4i, 4j, 4o (audio generation) | Azure Portal > Cognitive Services > Speech |
 | Gemini API | `NANO_BANANA_API_KEY` | Sections 4e, 4p (image generation) | [aistudio.google.com](https://aistudio.google.com) |
+| Telegram Bot | `TELEGRAM_BOT_TOKEN` | Section 9 (Telegram bot) | [@BotFather](https://t.me/BotFather) on Telegram |
 
 **AI Backend notes:** You need either option A (SDK) or option B (CLI), not both. SDK supports all features including vision extraction. CLI supports text enrichment only (vision/extraction still requires SDK). Configure via Settings page > AI Backend section.
 
@@ -41,6 +42,8 @@ Before running tests, configure all API keys via the **Settings page** (`/settin
 - **Section 3** (Browse) — only needs Anki running
 - **Section 5** (Upload) — needs AI backend for extraction (SDK only — vision not supported in CLI)
 - **Section 7** (Settings) — no external services needed at all
+- **Section 9a** (Telegram settings) — no external services needed
+- **Section 9b-9f** (Telegram bot) — needs real bot token from @BotFather
 
 ---
 
@@ -444,6 +447,47 @@ After all tests:
 ### 8e. Pass-through args
 - Run `npm run dev -- --port 3001`
 - Verify dev server starts on port 3001
+
+---
+
+## 9. Telegram Bot
+
+### 9a. Settings fields
+- Navigate to `/settings`
+- Verify "Telegram Bot" section appears with MessageCircle icon
+- Verify two fields: "Bot Token" (secret) and "Allowed User IDs" (non-secret)
+- Verify placeholders: `123456:ABC-DEF...` and `123456789, 987654321`
+- Verify description text about auto-start and restart requirement
+- Enter a test token, click Save, verify "Saved" confirmation
+- Clear the token, save, verify "Not set"
+
+### 9b. Bot startup (manual verification)
+- Configure a real bot token via Settings page
+- Restart the dev server (`npm run dev`)
+- Check terminal output for `[Telegram] Bot started (long-polling)`
+- If no token configured, verify `[Telegram] No bot token configured — skipping`
+
+### 9c. Word list via Telegram (manual)
+- Send a message to the bot: `__test_tg_word1, __test_tg_word2`
+- Verify bot replies with progress updates (checking duplicates, creating, enriching)
+- Verify final result message shows "Created: 2 cards"
+- In Browse page, verify `__test_tg_word1` and `__test_tg_word2` exist with enriched fields
+
+### 9d. Photo extraction via Telegram (manual)
+- Send a worksheet photo to the bot
+- Verify bot replies with "Extracting words from worksheet..."
+- Verify bot processes and reports results
+
+### 9e. Unauthorized user (manual)
+- Set `TELEGRAM_ALLOWED_USERS` to a different user ID
+- Send a message from your account
+- Verify "You are not authorized to use this bot" reply
+
+### 9f. Anki not reachable (manual)
+- Stop Anki
+- Send a word to the bot
+- Verify "Anki is not reachable" reply
+- Restart Anki
 
 ---
 

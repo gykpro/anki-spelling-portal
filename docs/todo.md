@@ -6,11 +6,11 @@
 - [x] **Feature 5: Auto-Enrich on Add** — After Quick Add, "Enrich N Cards" button navigates to enrich page with autoEnrich=true. Pipeline runs: text batch → save → audio per card → save. Progress banner shows each phase.
 - [x] **Batch Audio Generation** — "Generate All Audio (N)" button on enrich page batch-generates word audio (+ sentence audio where available) for all cards missing audio.
 - [x] **Batch Image Generation** — "Generate All Images (N)" button on enrich page batch-generates images for all cards that have sentences but no image.
+- [x] **Feature 6: Telegram Bot Integration** — Telegram bot via grammy (long-polling) that accepts words or worksheet photos, creates cards, and auto-enriches with text, audio, and images. Runs inside Next.js via instrumentation.ts. Access control via allowed user IDs in Settings.
 
 ## In Progress
 
 ## Pending
-- [ ] **Feature 6: Telegram Bot Integration** — Telegram bot that accepts words via message and adds them to Anki. Could also support worksheet photo extraction.
 
 ## Infrastructure
 - [x] **Docker + NAS Deployment** — Replaced Claude CLI with Anthropic SDK, added Dockerfile, docker-compose.yml (headless Anki + portal), NAS setup guide. Enables 24/7 operation on Synology NAS.

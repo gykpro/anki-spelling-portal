@@ -12,6 +12,7 @@ import {
   Cpu,
   Terminal,
   Zap,
+  MessageCircle,
 } from "lucide-react";
 
 interface ConfigStatus {
@@ -29,7 +30,9 @@ type ConfigKey =
   | "AZURE_TTS_REGION"
   | "NANO_BANANA_API_KEY"
   | "ANKI_CONNECT_URL"
-  | "AI_BACKEND";
+  | "AI_BACKEND"
+  | "TELEGRAM_BOT_TOKEN"
+  | "TELEGRAM_ALLOWED_USERS";
 
 type SettingsData = Record<ConfigKey, ConfigStatus>;
 
@@ -54,6 +57,11 @@ const SECTIONS = {
     description: "Non-secret service configuration.",
     keys: ["AZURE_TTS_REGION", "ANKI_CONNECT_URL"] as ConfigKey[],
   },
+  telegram: {
+    title: "Telegram Bot",
+    description: "Send words or worksheet photos via Telegram to add and enrich cards automatically. Create a bot via @BotFather to get a token.",
+    keys: ["TELEGRAM_BOT_TOKEN", "TELEGRAM_ALLOWED_USERS"] as ConfigKey[],
+  },
 };
 
 const KEY_LABELS: Record<ConfigKey, string> = {
@@ -64,6 +72,8 @@ const KEY_LABELS: Record<ConfigKey, string> = {
   NANO_BANANA_API_KEY: "Gemini API Key",
   ANKI_CONNECT_URL: "AnkiConnect URL",
   AI_BACKEND: "Backend Mode",
+  TELEGRAM_BOT_TOKEN: "Bot Token",
+  TELEGRAM_ALLOWED_USERS: "Allowed User IDs",
 };
 
 const KEY_PLACEHOLDERS: Partial<Record<ConfigKey, string>> = {
@@ -73,6 +83,8 @@ const KEY_PLACEHOLDERS: Partial<Record<ConfigKey, string>> = {
   AZURE_TTS_REGION: "australiaeast",
   NANO_BANANA_API_KEY: "AIza...",
   ANKI_CONNECT_URL: "http://localhost:8765",
+  TELEGRAM_BOT_TOKEN: "123456:ABC-DEF...",
+  TELEGRAM_ALLOWED_USERS: "123456789, 987654321",
 };
 
 export default function SettingsPage() {
@@ -275,6 +287,39 @@ export default function SettingsPage() {
             />
           ))}
         </div>
+      </section>
+
+      {/* Telegram Bot Section */}
+      <section className="rounded-lg border border-border p-5 space-y-4">
+        <div className="flex items-center gap-2">
+          <MessageCircle className="h-5 w-5 text-blue-500" />
+          <div>
+            <h2 className="text-lg font-semibold">{SECTIONS.telegram.title}</h2>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              {SECTIONS.telegram.description}
+            </p>
+          </div>
+        </div>
+        <div className="space-y-3">
+          {SECTIONS.telegram.keys.map((key) => (
+            <SettingsField
+              key={key}
+              configKey={key}
+              status={settings[key]}
+              dirtyValue={dirty[key]}
+              onChange={(val) => setField(key, val)}
+              onClear={() => clearField(key)}
+              showSecret={showSecrets[key] ?? false}
+              onToggleSecret={() =>
+                setShowSecrets((prev) => ({ ...prev, [key]: !prev[key] }))
+              }
+            />
+          ))}
+        </div>
+        <p className="text-xs text-muted-foreground">
+          The bot starts automatically when the server boots (if a token is configured). Restart the server after changing the token.
+          Leave "Allowed User IDs" empty to allow all users.
+        </p>
       </section>
     </div>
   );

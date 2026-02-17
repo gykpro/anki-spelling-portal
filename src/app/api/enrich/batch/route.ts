@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { runAI } from "@/lib/ai";
-import {
-  type TextEnrichField,
-  getFieldDescriptions,
-  ENRICH_SUFFIX,
-} from "@/lib/enrich-prompts";
+import { extractJsonArray, buildBatchPrompt } from "@/lib/enrichment-pipeline";
 import type {
   BatchEnrichRequest,
   BatchEnrichResultItem,
@@ -12,56 +8,6 @@ import type {
 } from "@/types/enrichment";
 
 const MAX_BATCH_SIZE = 20;
-
-/** Extract a JSON array from text that may contain preamble or code fences */
-function extractJsonArray(text: string): Record<string, unknown>[] {
-  let s = text.trim();
-  // Strip markdown code fences
-  if (s.startsWith("```")) {
-    s = s.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
-  }
-  // Try direct parse first
-  try {
-    const result = JSON.parse(s);
-    if (Array.isArray(result)) return result;
-  } catch {
-    // Fall through to extraction
-  }
-  // Find the first '[' and last ']' to extract the array
-  const start = s.indexOf("[");
-  const end = s.lastIndexOf("]");
-  if (start === -1 || end === -1 || end <= start) {
-    throw new Error("No JSON array found in response");
-  }
-  return JSON.parse(s.slice(start, end + 1));
-}
-
-function buildBatchPrompt(
-  cards: BatchEnrichRequest["cards"],
-  fields: TextEnrichField[]
-): string {
-  const fieldDescs = getFieldDescriptions(fields);
-
-  const wordList = cards
-    .map((c, i) => {
-      let line = `${i + 1}. Word/phrase: "${c.word}"`;
-      if (c.sentence) line += ` | Context sentence: "${c.sentence}"`;
-      return line;
-    })
-    .join("\n");
-
-  return `I have ${cards.length} words/phrases. For EACH word, generate these fields:
-{
-  ${fieldDescs.join(",\n  ")}
-}
-
-Words:
-${wordList}
-
-Return ONLY a JSON array with exactly ${cards.length} objects, one per word in the same order. Each object must include a "word" field matching the input. No markdown, no code fences.
-
-${ENRICH_SUFFIX}`;
-}
 
 export async function POST(request: NextRequest) {
   try {

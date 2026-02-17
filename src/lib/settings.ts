@@ -13,6 +13,8 @@ const CONFIG_KEYS = {
   NANO_BANANA_API_KEY: { secret: true, envAllowed: false, description: "Gemini API key for image generation" },
   ANKI_CONNECT_URL: { secret: false, envAllowed: true, description: "AnkiConnect URL", default: "http://localhost:8765" },
   AI_BACKEND: { secret: false, envAllowed: false, description: "AI backend: auto, sdk, or cli", default: "auto" },
+  TELEGRAM_BOT_TOKEN: { secret: true, envAllowed: false, description: "Telegram Bot API token from @BotFather" },
+  TELEGRAM_ALLOWED_USERS: { secret: false, envAllowed: false, description: "Comma-separated Telegram user IDs allowed to use the bot" },
 } as const;
 
 export type ConfigKey = keyof typeof CONFIG_KEYS;
