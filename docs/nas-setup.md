@@ -5,8 +5,7 @@
 ```
 Synology NAS (Docker)
 ├── anki-headless    (port 8765) — Anki + AnkiConnect, syncs with AnkiWeb
-├── spelling-portal  (port 3000) — Next.js app (enrichment, TTS, image gen)
-└── (future) telegram-bot
+├── spelling-portal  (port 3000) — Next.js app + Telegram bot (enrichment, TTS, image gen)
 ```
 
 ## Prerequisites
@@ -41,6 +40,8 @@ Visit `http://<nas-ip>:3000/settings` in your browser and enter your API keys:
 - **Anthropic API Key** — for AI enrichment (extraction + text generation)
 - **Azure TTS Key + Region** — for audio generation
 - **Gemini API Key** — for image generation
+- **Telegram Bot Token** — for Telegram bot (see [telegram-setup.md](telegram-setup.md))
+- **Telegram Allowed Users** — comma-separated user IDs (optional)
 
 Keys are stored in the `portal-data` Docker volume and persist across restarts.
 
