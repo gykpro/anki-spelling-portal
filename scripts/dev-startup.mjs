@@ -131,10 +131,16 @@ async function main() {
   console.log();
 
   // 3. Start next dev, passing through all args after --
+  // Unset CLAUDECODE so the CLI AI backend can spawn claude subprocess
+  // (avoids "nested session" error when dev server is started from Claude Code)
+  const env = { ...process.env };
+  delete env.CLAUDECODE;
+
   const extraArgs = process.argv.slice(2);
   const child = spawn("npx", ["next", "dev", ...extraArgs], {
     stdio: "inherit",
     shell: true,
+    env,
   });
 
   child.on("exit", (code) => {
