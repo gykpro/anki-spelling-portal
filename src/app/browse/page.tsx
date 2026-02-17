@@ -42,7 +42,23 @@ export default function BrowsePage() {
       );
       const data = await res.json();
       if (data.error) throw new Error(data.error);
-      setAllNotes(data.notes || []);
+      let notes: AnkiNote[] = data.notes || [];
+      // When searching, sort word-field matches first
+      if (query && !query.startsWith("tag:")) {
+        const q = query.toLowerCase();
+        notes = [...notes].sort((a, b) => {
+          const aWord = (a.fields.Word?.value || "").toLowerCase();
+          const bWord = (b.fields.Word?.value || "").toLowerCase();
+          const aMatch = aWord.includes(q) ? 1 : 0;
+          const bMatch = bWord.includes(q) ? 1 : 0;
+          if (aMatch !== bMatch) return bMatch - aMatch;
+          // Among word matches, exact match first
+          const aExact = aWord === q ? 1 : 0;
+          const bExact = bWord === q ? 1 : 0;
+          return bExact - aExact;
+        });
+      }
+      setAllNotes(notes);
       setTotal(data.total || 0);
       setPage(1);
     } catch (err) {
