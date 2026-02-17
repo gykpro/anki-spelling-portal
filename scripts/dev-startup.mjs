@@ -13,23 +13,7 @@ const red = (s) => `\x1b[31m${s}\x1b[0m`;
 const dim = (s) => `\x1b[2m${s}\x1b[0m`;
 const bold = (s) => `\x1b[1m${s}\x1b[0m`;
 
-// ── Load config sources ──────────────────────────────────────────────
-
-function loadEnvFile() {
-  const envPath = join(ROOT, ".env.local");
-  if (!existsSync(envPath)) return {};
-  const vars = {};
-  for (const line of readFileSync(envPath, "utf-8").split("\n")) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) continue;
-    const eq = trimmed.indexOf("=");
-    if (eq === -1) continue;
-    const key = trimmed.slice(0, eq).trim();
-    const val = trimmed.slice(eq + 1).trim();
-    if (val) vars[key] = val;
-  }
-  return vars;
-}
+// ── Load config ──────────────────────────────────────────────────────
 
 function loadSecretsFile() {
   const secretsPath = join(ROOT, "data", "secrets.json");
@@ -41,9 +25,8 @@ function loadSecretsFile() {
   }
 }
 
-function getVal(key, secrets, env) {
+function getVal(key, secrets) {
   if (secrets[key]) return { value: secrets[key], source: "settings" };
-  if (env[key]) return { value: env[key], source: "env" };
   return { value: null, source: null };
 }
 
@@ -91,24 +74,23 @@ async function main() {
 
   // 2. Config checks
   const secrets = loadSecretsFile();
-  const env = loadEnvFile();
 
   // AI Backend
-  const anthropicKey = getVal("ANTHROPIC_API_KEY", secrets, env);
-  const oauthToken = getVal("CLAUDE_CODE_OAUTH_TOKEN", secrets, env);
-  const aiBackendSetting = getVal("AI_BACKEND", secrets, env);
+  const anthropicKey = getVal("ANTHROPIC_API_KEY", secrets);
+  const oauthToken = getVal("CLAUDE_CODE_OAUTH_TOKEN", secrets);
+  const aiBackendSetting = getVal("AI_BACKEND", secrets);
   const backendMode = aiBackendSetting.value || "auto";
 
   let aiLine;
   if (backendMode === "sdk" || (backendMode === "auto" && anthropicKey.value)) {
     if (anthropicKey.value) {
-      aiLine = green("SDK") + dim(` (from ${anthropicKey.source})`);
+      aiLine = green("SDK");
     } else {
       aiLine = red("SDK selected but no API key") + dim(" — go to /settings");
     }
   } else if (backendMode === "cli" || (backendMode === "auto" && oauthToken.value)) {
     if (oauthToken.value) {
-      aiLine = green("CLI") + dim(` (from ${oauthToken.source})`);
+      aiLine = green("CLI");
     } else {
       aiLine = red("CLI selected but no OAuth token") + dim(" — go to /settings");
     }
@@ -118,30 +100,30 @@ async function main() {
   console.log(`  ${bold("AI Backend:")}    ${aiLine}`);
 
   // Azure TTS
-  const azureKey = getVal("AZURE_TTS_KEY", secrets, env);
-  const azureRegion = getVal("AZURE_TTS_REGION", secrets, env);
+  const azureKey = getVal("AZURE_TTS_KEY", secrets);
   let azureLine;
   if (azureKey.value) {
-    azureLine = green("Configured") + dim(` (from ${azureKey.source})`);
+    azureLine = green("Configured");
   } else {
     azureLine = yellow("Not set") + dim(" — audio generation unavailable");
   }
   console.log(`  ${bold("Azure TTS:")}     ${azureLine}`);
 
   // Gemini / Nano Banana
-  const geminiKey = getVal("NANO_BANANA_API_KEY", secrets, env);
+  const geminiKey = getVal("NANO_BANANA_API_KEY", secrets);
   let geminiLine;
   if (geminiKey.value) {
-    geminiLine = green("Configured") + dim(` (from ${geminiKey.source})`);
+    geminiLine = green("Configured");
   } else {
     geminiLine = yellow("Not set") + dim(" — image generation unavailable");
   }
   console.log(`  ${bold("Gemini:")}        ${geminiLine}`);
 
-  // AnkiConnect URL
-  const ankiUrl = getVal("ANKI_CONNECT_URL", secrets, env);
-  const urlValue = ankiUrl.value || "http://localhost:8765";
-  const urlSource = ankiUrl.source || "default";
+  // AnkiConnect URL (only key that supports env var — for Docker)
+  const ankiUrl = getVal("ANKI_CONNECT_URL", secrets);
+  const envAnkiUrl = process.env.ANKI_CONNECT_URL;
+  const urlValue = ankiUrl.value || envAnkiUrl || "http://localhost:8765";
+  const urlSource = ankiUrl.value ? "settings" : envAnkiUrl ? "env" : "default";
   console.log(`  ${bold("AnkiConnect:")}   ${dim(`${urlValue} (${urlSource})`)}`);
 
   console.log();

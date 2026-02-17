@@ -17,7 +17,7 @@ Synology NAS (Docker)
 
 ## Quick Start
 
-### 1. Clone and configure
+### 1. Clone and start
 
 ```bash
 # SSH into NAS
@@ -27,15 +27,7 @@ ssh user@nas-ip
 git clone <repo-url> /volume1/docker/spelling-portal
 cd /volume1/docker/spelling-portal
 
-# Create .env from template
-cp .env.docker .env
-# Edit .env and fill in your API keys
-nano .env
-```
-
-### 2. Start services
-
-```bash
+# Start services
 docker compose up -d
 ```
 
@@ -43,7 +35,16 @@ This starts:
 - `anki-headless` on port 8765 (Anki with AnkiConnect)
 - `spelling-portal` on port 3000 (Next.js app)
 
-### 3. Initial AnkiWeb sync
+### 2. Configure API keys
+
+Visit `http://<nas-ip>:3000/settings` in your browser and enter your API keys:
+- **Anthropic API Key** — for AI enrichment (extraction + text generation)
+- **Azure TTS Key + Region** — for audio generation
+- **Gemini API Key** — for image generation
+
+Keys are stored in the `portal-data` Docker volume and persist across restarts.
+
+### 3. Initial AnkiWeb sync (first run)
 
 On first run, you need to sync with AnkiWeb to pull your existing cards:
 
@@ -68,18 +69,13 @@ This keeps the NAS Anki in sync with AnkiWeb so changes from your desktop Anki (
 
 ## Local Development
 
-When developing on your MacBook, you can point the portal at the NAS Anki instance:
+When developing on your MacBook:
 
-```bash
-# In .env.local
-ANKI_CONNECT_URL=http://<nas-ip>:8765
-ANTHROPIC_API_KEY=sk-ant-...
-AZURE_TTS_KEY=...
-AZURE_TTS_REGION=australiaeast
-NANO_BANANA_API_KEY=...
-```
+1. Run `npm run dev` to start the dev server
+2. Visit `http://localhost:3000/settings` to configure API keys
+3. To point at the NAS Anki instance, set `ANKI_CONNECT_URL` in Settings to `http://<nas-ip>:8765`
 
-Or keep using local Anki (synced via AnkiWeb) — just omit `ANKI_CONNECT_URL` and it defaults to `http://localhost:8765`.
+Or keep using local Anki (synced via AnkiWeb) — the default `http://localhost:8765` works automatically.
 
 ## Updating
 

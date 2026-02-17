@@ -307,9 +307,8 @@ function StatusBadge({ status }: { status: ConfigStatus }) {
     return (
       <span className="inline-flex items-center gap-1 text-xs">
         <CheckCircle2 className="h-3 w-3 text-green-600" />
-        <span className="text-green-700">Configured</span>
-        <span className="text-muted-foreground">
-          ({status.source === "file" ? "from file" : status.source === "env" ? "from env" : "default"})
+        <span className="text-green-700">
+          {status.source === "default" ? "Default" : "Configured"}
         </span>
       </span>
     );
@@ -382,7 +381,7 @@ function SettingsField({
       </div>
       {willClear && (
         <p className="text-xs text-red-600">
-          Will remove stored value on save (falls back to env var if set)
+          Will remove stored value on save
         </p>
       )}
       {status.configured && status.secret && !hasDirtyValue && (

@@ -6,13 +6,13 @@ const SECRETS_FILE = join(DATA_DIR, "secrets.json");
 
 /** All managed config keys and their metadata */
 const CONFIG_KEYS = {
-  ANTHROPIC_API_KEY: { secret: true, description: "Anthropic API key (SDK mode)" },
-  CLAUDE_CODE_OAUTH_TOKEN: { secret: true, description: "Claude Max OAuth token (CLI mode)" },
-  AZURE_TTS_KEY: { secret: true, description: "Azure TTS subscription key" },
-  AZURE_TTS_REGION: { secret: false, description: "Azure TTS region", default: "australiaeast" },
-  NANO_BANANA_API_KEY: { secret: true, description: "Gemini API key for image generation" },
-  ANKI_CONNECT_URL: { secret: false, description: "AnkiConnect URL", default: "http://localhost:8765" },
-  AI_BACKEND: { secret: false, description: "AI backend: auto, sdk, or cli", default: "auto" },
+  ANTHROPIC_API_KEY: { secret: true, envAllowed: false, description: "Anthropic API key (SDK mode)" },
+  CLAUDE_CODE_OAUTH_TOKEN: { secret: true, envAllowed: false, description: "Claude Max OAuth token (CLI mode)" },
+  AZURE_TTS_KEY: { secret: true, envAllowed: false, description: "Azure TTS subscription key" },
+  AZURE_TTS_REGION: { secret: false, envAllowed: false, description: "Azure TTS region", default: "australiaeast" },
+  NANO_BANANA_API_KEY: { secret: true, envAllowed: false, description: "Gemini API key for image generation" },
+  ANKI_CONNECT_URL: { secret: false, envAllowed: true, description: "AnkiConnect URL", default: "http://localhost:8765" },
+  AI_BACKEND: { secret: false, envAllowed: false, description: "AI backend: auto, sdk, or cli", default: "auto" },
 } as const;
 
 export type ConfigKey = keyof typeof CONFIG_KEYS;
@@ -66,13 +66,15 @@ function maskValue(value: string, isSecret: boolean): string {
   return value.slice(0, 4) + "..." + value.slice(-4);
 }
 
-/** Get a single config value. Priority: file > env > default */
+/** Get a single config value. Priority: file > env (if allowed) > default */
 export function getConfig(key: ConfigKey): string {
   const stored = readFile();
   if (stored[key]) return stored[key];
-  const envVal = process.env[key];
-  if (envVal) return envVal;
   const meta = CONFIG_KEYS[key];
+  if (meta.envAllowed) {
+    const envVal = process.env[key];
+    if (envVal) return envVal;
+  }
   if ("default" in meta && meta.default) return meta.default;
   return "";
 }
@@ -85,7 +87,7 @@ export function getAllConfigStatus(): Record<ConfigKey, ConfigStatus> {
   for (const [key, meta] of Object.entries(CONFIG_KEYS)) {
     const k = key as ConfigKey;
     const fileVal = stored[k];
-    const envVal = process.env[k];
+    const envVal = meta.envAllowed ? process.env[k] : undefined;
     const defaultVal = "default" in meta ? meta.default : undefined;
 
     let source: ConfigStatus["source"] = "none";
@@ -114,7 +116,7 @@ export function getAllConfigStatus(): Record<ConfigKey, ConfigStatus> {
   return result;
 }
 
-/** Save settings updates. Empty string = delete key from file (fallback to env). */
+/** Save settings updates. Empty string = delete key from file. */
 export function saveSettings(updates: Partial<Record<ConfigKey, string>>): void {
   const stored = readFile();
   const newData = { ...stored };

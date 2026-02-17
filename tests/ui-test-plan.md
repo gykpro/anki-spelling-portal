@@ -11,9 +11,9 @@ what you actually see on screen. Create test data, verify, then clean up.
 3. **Chrome browser** with Claude extension connected for browser automation
 
 ### Environment Setup
-Before running tests, the following must be configured (via `/settings` page or `.env.local`):
+Before running tests, configure all API keys via the **Settings page** (`/settings`):
 
-| Service | Env Variable | Required For | How to Get |
+| Service | Settings Key | Required For | How to Get |
 |---------|-------------|--------------|------------|
 | AnkiConnect | `ANKI_CONNECT_URL` | Sections 1-6 (all card operations) | Default `localhost:8765`, just have Anki open |
 | AI Backend (option A) | `ANTHROPIC_API_KEY` | Sections 4, 5 (enrichment, extraction) | [console.anthropic.com](https://console.anthropic.com) — pay-per-use |
@@ -23,13 +23,15 @@ Before running tests, the following must be configured (via `/settings` page or 
 
 **AI Backend notes:** You need either option A (SDK) or option B (CLI), not both. SDK supports all features including vision extraction. CLI supports text enrichment only (vision/extraction still requires SDK). Configure via Settings page > AI Backend section.
 
+**Note:** API keys are stored in `data/secrets.json` (managed by the Settings page). Environment variables are NOT used for API keys — only `ANKI_CONNECT_URL` can be set via env (for Docker).
+
 ### Setup Steps
 1. Start Anki desktop app (ensure AnkiConnect plugin is installed)
 2. Run `npm run dev` in the project root
 3. Navigate to `http://localhost:3000/settings`
 4. Choose your AI backend (Auto/SDK/CLI) and enter the corresponding key
 5. Enter other API keys for the sections you plan to test
-6. Click "Save Changes" and verify keys show as "Configured (from file)"
+6. Click "Save Changes" and verify keys show as "Configured"
 7. Verify the "Active backend" badge shows SDK or CLI (not "Not configured")
 8. Start testing from Section 1
 
@@ -377,7 +379,7 @@ After all tests:
 
 ### 7c. View config status
 - Verify each API key field shows status badge: "Configured" (green) or "Not set" (gray)
-- Verify configured keys show source: "from file", "from env", or "default"
+- Verify fields with defaults show "Default" badge
 - Verify secret fields show masked value (e.g., "sk-a...1234") beneath input
 - Verify non-secret fields (AZURE_TTS_REGION, ANKI_CONNECT_URL) show full current value
 
@@ -385,12 +387,12 @@ After all tests:
 - In "Configuration" section, type `australiaeast` in AZURE_TTS_REGION field
 - Verify "Save Changes" button enables
 - Click "Save Changes" — verify "Saved" confirmation appears
-- Reload page — verify AZURE_TTS_REGION shows "Configured (from file)"
+- Reload page — verify AZURE_TTS_REGION shows "Configured"
 
 ### 7e. Set a secret value
 - Type a test value in ANTHROPIC_API_KEY field (e.g., "sk-ant-test1234567890abcdef")
 - Click "Save Changes" — verify save succeeds
-- Verify status changes to "Configured (from file)"
+- Verify status changes to "Configured"
 - Verify masked value shows (e.g., "sk-a...cdef")
 - Verify the input field is cleared (does not show the full key)
 
@@ -398,7 +400,7 @@ After all tests:
 - On a configured field, click the "Clear" button
 - Verify field shows "Will remove stored value on save" warning in red
 - Click "Save Changes" — verify value is cleared
-- Verify status falls back to env var or "Not set"
+- Verify status shows "Not set"
 
 ### 7g. Eye toggle for secrets
 - On a secret field, verify input type is "password" (dots shown)
@@ -428,13 +430,13 @@ After all tests:
 - Verify dev server starts immediately
 
 ### 8c. Config status with keys configured
-- Ensure `.env.local` has Azure and Gemini keys
+- Ensure `data/secrets.json` has Azure and Gemini keys (via Settings page)
 - Run `npm run dev`
 - Verify green "Configured" shown for Azure TTS and Gemini
-- Verify AnkiConnect URL shown with source
+- Verify AnkiConnect URL shown with source (default or settings)
 
 ### 8d. Missing AI backend warning
-- Remove all AI keys from both `.env.local` and `data/secrets.json`
+- Remove all AI keys from `data/secrets.json`
 - Run `npm run dev`
 - Verify red "Not configured" warning for AI Backend
 - Verify dev server still starts (non-blocking)
