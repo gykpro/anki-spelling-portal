@@ -9,7 +9,8 @@ import { getConfig } from "./settings";
 
 async function invoke<T = unknown>(
   action: string,
-  params?: Record<string, unknown>
+  params?: Record<string, unknown>,
+  timeoutMs = 30000
 ): Promise<T> {
   const url = getConfig("ANKI_CONNECT_URL");
   const body: AnkiConnectRequest = { action, version: 6, params };
@@ -17,6 +18,7 @@ async function invoke<T = unknown>(
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
+    signal: AbortSignal.timeout(timeoutMs),
   });
 
   if (!res.ok) {

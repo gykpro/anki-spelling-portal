@@ -682,16 +682,20 @@ export async function distributeNotes(
   for (const targetProfile of targetProfiles) {
     if (targetProfile === homeProfile) continue;
 
+    console.log(`[Distribution] Starting distribution to "${targetProfile}"...`);
     if (progress) {
       await progress.update(`Distributing to ${targetProfile}...`);
     }
 
     const result = await withProfileLock(async () => {
       try {
+        console.log(`[Distribution] Switching to profile "${targetProfile}"...`);
         await ankiConnect.loadProfileAndWait(targetProfile);
+        console.log(`[Distribution] Switched to "${targetProfile}" successfully`);
 
         const decks = await ankiConnect.deckNames();
         if (!decks.includes(DECK_NAME)) {
+          console.log(`[Distribution] Deck "${DECK_NAME}" not found in "${targetProfile}", skipping`);
           await ankiConnect.loadProfileAndWait(homeProfile);
           return {
             profile: targetProfile,
@@ -703,6 +707,7 @@ export async function distributeNotes(
 
         const models = await ankiConnect.modelNames();
         if (!models.includes(MODEL_NAME)) {
+          console.log(`[Distribution] Model "${MODEL_NAME}" not found in "${targetProfile}", skipping`);
           await ankiConnect.loadProfileAndWait(homeProfile);
           return {
             profile: targetProfile,
@@ -723,8 +728,9 @@ export async function distributeNotes(
           const uuid = fields["Note ID"];
           if (!uuid) continue;
 
+          // Search by UUID text within the deck
           const existing = await ankiConnect.findNotes(
-            `deck:"${DECK_NAME}" "Note ID:${uuid}"`
+            `deck:"${DECK_NAME}" "${uuid}"`
           );
 
           if (existing.length > 0) {
@@ -744,9 +750,12 @@ export async function distributeNotes(
           distributed++;
         }
 
+        console.log(`[Distribution] Distributed ${distributed} notes to "${targetProfile}", switching back...`);
         await ankiConnect.loadProfileAndWait(homeProfile);
+        console.log(`[Distribution] Switched back to "${homeProfile}" successfully`);
         return { profile: targetProfile, success: true, notesDistributed: distributed };
       } catch (err) {
+        console.error(`[Distribution] Error distributing to "${targetProfile}":`, err);
         try { await ankiConnect.loadProfileAndWait(homeProfile); } catch { /* ignore */ }
         return {
           profile: targetProfile,

@@ -375,6 +375,8 @@ function EnrichContent() {
   const [autoEnrichPhase, setAutoEnrichPhase] = useState<string | null>(null);
   const autoEnrichTriggered = useRef(false);
   const [distTargets, setDistTargets] = useState<string[]>([]);
+  const distTargetsRef = useRef(distTargets);
+  distTargetsRef.current = distTargets;
   const [distResults, setDistResults] = useState<DistributeResult[] | null>(null);
   const [distributing, setDistributing] = useState(false);
 
@@ -1110,10 +1112,11 @@ function EnrichContent() {
     }
 
     // Distribute to target profiles
-    if (distTargets.length > 0) {
+    const targets = distTargetsRef.current;
+    if (targets.length > 0) {
       setAutoEnrichPhase("Distributing to other profiles...");
       const allNoteIds = currentNotes.map((n) => n.noteId);
-      await distribute(allNoteIds, distTargets);
+      await distribute(allNoteIds, targets);
     }
 
     // Done — build summary
@@ -1130,7 +1133,7 @@ function EnrichContent() {
     setBatchEnriching(false);
     setBatchProgress("");
     fetchNotes();
-  }, [fetchNotes, distTargets, distribute]);
+  }, [fetchNotes, distribute]);
 
   // Trigger auto-enrich when notes loaded and autoEnrich param present
   useEffect(() => {

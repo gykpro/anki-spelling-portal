@@ -81,9 +81,9 @@ export async function POST(request: NextRequest) {
             const uuid = fields["Note ID"];
             if (!uuid) continue;
 
-            // Search for existing note by UUID
+            // Search for existing note by UUID text
             const existing = await ankiConnect.findNotes(
-              `deck:"${DECK_NAME}" "Note ID:${uuid}"`
+              `deck:"${DECK_NAME}" "${uuid}"`
             );
 
             if (existing.length > 0) {
