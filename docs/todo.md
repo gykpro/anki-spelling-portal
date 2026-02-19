@@ -15,6 +15,7 @@
 ## Pending
 
 ## Recently Completed
+- [x] **Release Process** — `scripts/release.sh` automates versioning, Docker image build, skill tarball packaging, and git tagging.
 - [x] **Multi-Profile Distribution** — Switch active Anki profile from the portal sidebar/settings, and distribute cards (on create and on enrich) to other profiles automatically. Profile switcher in sidebar, distribution target config in Settings, auto-distribute on Quick Add, Enrich save, and Telegram bot pipeline.
 
 ## Infrastructure

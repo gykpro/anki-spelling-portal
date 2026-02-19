@@ -45,3 +45,6 @@ next-env.d.ts
 
 # settings data (contains secrets)
 /data/
+
+# release artifacts
+/releases/
