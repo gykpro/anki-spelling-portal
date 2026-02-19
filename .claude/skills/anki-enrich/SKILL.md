@@ -42,34 +42,34 @@ Match the user's intent to the appropriate script:
 
 ## Script Invocations
 
-All scripts are in `.claude/skills/anki-enrich/scripts/`. Run with `node`:
+All scripts are in `skill/scripts/`. Run with `node`:
 
 ### Full enrichment (most common)
 ```bash
-node .claude/skills/anki-enrich/scripts/enrich-full.mjs --words "adventure,magnificent"
-node .claude/skills/anki-enrich/scripts/enrich-full.mjs --noteIds 1234567890,1234567891
+node skill/scripts/enrich-full.mjs --words "adventure,magnificent"
+node skill/scripts/enrich-full.mjs --noteIds 1234567890,1234567891
 ```
 
 ### Text only
 ```bash
-node .claude/skills/anki-enrich/scripts/enrich-text.mjs --words "adventure,magnificent"
-node .claude/skills/anki-enrich/scripts/enrich-text.mjs --words "adventure" --fields definition,phonetic
+node skill/scripts/enrich-text.mjs --words "adventure,magnificent"
+node skill/scripts/enrich-text.mjs --words "adventure" --fields definition,phonetic
 ```
 
 ### Audio only
 ```bash
-node .claude/skills/anki-enrich/scripts/enrich-audio.mjs --words "adventure,magnificent"
+node skill/scripts/enrich-audio.mjs --words "adventure,magnificent"
 ```
 
 ### Image only
 ```bash
-node .claude/skills/anki-enrich/scripts/enrich-image.mjs --words "adventure,magnificent"
+node skill/scripts/enrich-image.mjs --words "adventure,magnificent"
 ```
 
 ### Extract from worksheet
 ```bash
-node .claude/skills/anki-enrich/scripts/extract-worksheet.mjs --images /path/to/page.jpg
-node .claude/skills/anki-enrich/scripts/extract-worksheet.mjs --images /path/to/p1.jpg,/path/to/p2.jpg --enrich
+node skill/scripts/extract-worksheet.mjs --images /path/to/page.jpg
+node skill/scripts/extract-worksheet.mjs --images /path/to/p1.jpg,/path/to/p2.jpg --enrich
 ```
 
 ## Arguments
@@ -124,5 +124,5 @@ If you see "Cannot reach Anki portal", the portal server isn't running or `confi
 
 For one-off testing, override the API URL without editing config.json:
 ```bash
-ANKI_PORTAL_URL=http://other-host:3000 node .claude/skills/anki-enrich/scripts/enrich-full.mjs --words "test"
+ANKI_PORTAL_URL=http://other-host:3000 node skill/scripts/enrich-full.mjs --words "test"
 ```

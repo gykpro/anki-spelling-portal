@@ -8,7 +8,7 @@
 - [x] **Batch Image Generation** — "Generate All Images (N)" button on enrich page batch-generates images for all cards that have sentences but no image.
 - [x] **Feature 6: Telegram Bot Integration** — Telegram bot via grammy (long-polling) that accepts words or worksheet photos, creates cards, and auto-enriches with text, audio, and images. Runs inside Next.js via instrumentation.ts. Access control via allowed user IDs in Settings.
 - [x] **Anki Sync Before Save + Manual Sync** — Auto-sync before all write operations to prevent conflicts across devices. Manual "Sync" button on Dashboard with spinner and success/error feedback.
-- [x] **Claude Code Enrichment Skill** — Distributable skill in `.claude/skills/anki-enrich/` exposing the enrichment API as CLI scripts. Supports text enrichment, audio/image generation, full pipeline, and worksheet extraction. SKILL.md provides intent-to-script mapping for conversational use.
+- [x] **Claude Code Enrichment Skill** — Distributable skill in `skill/` exposing the enrichment API as CLI scripts. Supports text enrichment, audio/image generation, full pipeline, and worksheet extraction. SKILL.md provides intent-to-script mapping for conversational use.
 
 ## In Progress
 

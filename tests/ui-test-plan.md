@@ -517,62 +517,62 @@ These tests verify the skill scripts work correctly via command line.
 - All API keys configured (Anthropic, Azure TTS, Gemini)
 
 ### 10a. Health check
-- Run `node .claude/skills/anki-enrich/scripts/enrich-text.mjs --words "__test_skill_nonexistent"` (word not in Anki)
+- Run `node skill/scripts/enrich-text.mjs --words "__test_skill_nonexistent"` (word not in Anki)
 - Verify health check passes (no "Cannot reach" error) and warning about word not found
 - Stop the dev server, re-run the command
 - Verify "Cannot reach Anki portal" error
 
 ### 10b. Text enrichment
 - Quick Add `__test_skill_text` via the portal
-- Run `node .claude/skills/anki-enrich/scripts/enrich-text.mjs --words "__test_skill_text"`
+- Run `node skill/scripts/enrich-text.mjs --words "__test_skill_text"`
 - Verify stdout JSON shows `succeeded: 1`
 - Verify stderr shows "OK" with saved field count
 - In Browse, verify `__test_skill_text` has Definition, Phonetic, Synonyms fields
 
 ### 10c. Text enrichment with specific fields
-- Run `node .claude/skills/anki-enrich/scripts/enrich-text.mjs --words "__test_skill_text" --fields definition,phonetic`
+- Run `node skill/scripts/enrich-text.mjs --words "__test_skill_text" --fields definition,phonetic`
 - Verify only Definition and Phonetic are generated (2 fields)
 
 ### 10d. Audio generation
-- Run `node .claude/skills/anki-enrich/scripts/enrich-audio.mjs --words "__test_skill_text"`
+- Run `node skill/scripts/enrich-audio.mjs --words "__test_skill_text"`
 - Verify stdout JSON shows audio generated
 - In Browse, verify Audio field shows `[sound:...]`
 
 ### 10e. Image generation
-- Run `node .claude/skills/anki-enrich/scripts/enrich-image.mjs --words "__test_skill_text"`
+- Run `node skill/scripts/enrich-image.mjs --words "__test_skill_text"`
 - Verify stdout JSON shows image generated
 - In Browse, verify Picture field is populated
 
 ### 10f. Full pipeline
 - Quick Add `__test_skill_full` via the portal
-- Run `node .claude/skills/anki-enrich/scripts/enrich-full.mjs --words "__test_skill_full"`
+- Run `node skill/scripts/enrich-full.mjs --words "__test_skill_full"`
 - Verify stderr shows all 3 phases (text → audio → image)
 - Verify stdout JSON shows `succeeded: 1`
 - In Browse, verify card has all fields populated
 
 ### 10g. Full pipeline with new word creation
-- Run `node .claude/skills/anki-enrich/scripts/enrich-full.mjs --words "__test_skill_new"`
+- Run `node skill/scripts/enrich-full.mjs --words "__test_skill_new"`
 - Verify stderr shows "Creating notes for: __test_skill_new"
 - Verify note created in Anki and fully enriched
 
 ### 10h. Worksheet extraction (extraction only)
-- Run `node .claude/skills/anki-enrich/scripts/extract-worksheet.mjs --images /private/tmp/spelling_pages/page1.jpg` (if sample exists)
+- Run `node skill/scripts/extract-worksheet.mjs --images /private/tmp/spelling_pages/page1.jpg` (if sample exists)
 - Verify stdout JSON contains extracted pages with words and sentences
 - Skip if no sample worksheet images available
 
 ### 10i. Multiple words
-- Run `node .claude/skills/anki-enrich/scripts/enrich-full.mjs --words "__test_skill_multi1,__test_skill_multi2"`
+- Run `node skill/scripts/enrich-full.mjs --words "__test_skill_multi1,__test_skill_multi2"`
 - Verify both words created and enriched
 - Verify stdout shows `succeeded: 2`
 
 ### 10j. Error handling — portal down
 - Stop the dev server
-- Run `node .claude/skills/anki-enrich/scripts/enrich-full.mjs --words "test"`
+- Run `node skill/scripts/enrich-full.mjs --words "test"`
 - Verify exit code 2 and "Cannot reach Anki portal" error message
 - Restart dev server
 
 ### 10k. Config override
-- Run `ANKI_PORTAL_URL=http://localhost:9999 node .claude/skills/anki-enrich/scripts/enrich-text.mjs --words "test"`
+- Run `ANKI_PORTAL_URL=http://localhost:9999 node skill/scripts/enrich-text.mjs --words "test"`
 - Verify "Cannot reach Anki portal at http://localhost:9999" error (confirms env override works)
 
 ### 10l. Cleanup
