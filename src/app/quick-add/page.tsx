@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import {
   CheckCircle,
   AlertCircle,
@@ -27,6 +27,8 @@ export default function QuickAddPage() {
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [distTargets, setDistTargets] = useState<string[]>([]);
+  const distTargetsRef = useRef(distTargets);
+  distTargetsRef.current = distTargets;
   const [distResults, setDistResults] = useState<DistributeResult[] | null>(null);
   const [distributing, setDistributing] = useState(false);
 
@@ -115,7 +117,8 @@ export default function QuickAddPage() {
       setPhase("done");
 
       // Distribute to target profiles if any selected
-      if (noteIds.length > 0 && distTargets.length > 0) {
+      const targets = distTargetsRef.current;
+      if (noteIds.length > 0 && targets.length > 0) {
         setDistributing(true);
         try {
           const distRes = await fetch("/api/anki/distribute", {
@@ -123,7 +126,7 @@ export default function QuickAddPage() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               noteIds,
-              targetProfiles: distTargets,
+              targetProfiles: targets,
             }),
           });
           if (distRes.ok) {
