@@ -10,6 +10,8 @@ import {
   Sparkles,
 } from "lucide-react";
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
+import { DistributionTargets, DistributionStatus } from "@/components/shared/DistributionTargets";
+import type { DistributeResult } from "@/types/anki";
 
 type Phase = "input" | "checking" | "duplicates" | "submitting" | "done";
 
@@ -24,6 +26,9 @@ export default function QuickAddPage() {
     noteIds: number[];
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [distTargets, setDistTargets] = useState<string[]>([]);
+  const [distResults, setDistResults] = useState<DistributeResult[] | null>(null);
+  const [distributing, setDistributing] = useState(false);
 
   const words = wordsInput
     .split(/[,\n]/)
@@ -108,6 +113,29 @@ export default function QuickAddPage() {
       );
       setResult({ ...data.summary, noteIds });
       setPhase("done");
+
+      // Distribute to target profiles if any selected
+      if (noteIds.length > 0 && distTargets.length > 0) {
+        setDistributing(true);
+        try {
+          const distRes = await fetch("/api/anki/distribute", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              noteIds,
+              targetProfiles: distTargets,
+            }),
+          });
+          if (distRes.ok) {
+            const distData = await distRes.json();
+            setDistResults(distData.results);
+          }
+        } catch {
+          // Distribution is best-effort
+        } finally {
+          setDistributing(false);
+        }
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Submit failed");
       setPhase("input");
@@ -138,6 +166,8 @@ export default function QuickAddPage() {
     setError(null);
     setDuplicateWords([]);
     setSkippedWords(new Set());
+    setDistResults(null);
+    setDistributing(false);
   };
 
   const isDuplicate = (word: string) =>
@@ -168,6 +198,9 @@ export default function QuickAddPage() {
               </>
             )}
           </p>
+          <div className="mt-2 flex justify-center">
+            <DistributionStatus results={distResults} loading={distributing} />
+          </div>
           <div className="mt-4 flex justify-center gap-3">
             <button
               onClick={reset}
@@ -266,6 +299,11 @@ export default function QuickAddPage() {
               disabled={phase === "checking" || phase === "submitting"}
             />
           </div>
+
+          <DistributionTargets
+            selected={distTargets}
+            onChange={setDistTargets}
+          />
 
           {words.length > 0 && (
             <div className="flex items-center gap-3">

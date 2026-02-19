@@ -19,6 +19,8 @@ import {
   Zap,
   ImageIcon,
 } from "lucide-react";
+import { DistributionTargets, DistributionStatus } from "@/components/shared/DistributionTargets";
+import type { DistributeResult } from "@/types/anki";
 
 function getFieldValue(note: AnkiNote, field: string): string {
   return note.fields[field]?.value || "";
@@ -372,6 +374,30 @@ function EnrichContent() {
   const [batchProgress, setBatchProgress] = useState("");
   const [autoEnrichPhase, setAutoEnrichPhase] = useState<string | null>(null);
   const autoEnrichTriggered = useRef(false);
+  const [distTargets, setDistTargets] = useState<string[]>([]);
+  const [distResults, setDistResults] = useState<DistributeResult[] | null>(null);
+  const [distributing, setDistributing] = useState(false);
+
+  const distribute = useCallback(async (noteIds: number[], targets: string[]) => {
+    if (noteIds.length === 0 || targets.length === 0) return;
+    setDistributing(true);
+    setDistResults(null);
+    try {
+      const res = await fetch("/api/anki/distribute", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ noteIds, targetProfiles: targets }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setDistResults(data.results);
+      }
+    } catch {
+      // best-effort
+    } finally {
+      setDistributing(false);
+    }
+  }, []);
 
   const fetchNotes = useCallback(async () => {
     setLoading(true);
@@ -582,6 +608,11 @@ function EnrichContent() {
         [noteId]: { ...prev[noteId], saved: true },
       }));
 
+      // Distribute to target profiles
+      if (distTargets.length > 0) {
+        distribute([noteId], distTargets);
+      }
+
       // Refresh the note data
       fetchNotes();
     } catch (err) {
@@ -729,6 +760,11 @@ function EnrichContent() {
 
     setBatchProgress(`All ${savedCount} cards saved`);
     setSavingAll(false);
+
+    // Distribute all saved notes
+    if (distTargets.length > 0 && unsavedNoteIds.length > 0) {
+      distribute(unsavedNoteIds, distTargets);
+    }
   };
 
   const generateAllAudio = async () => {
@@ -1073,6 +1109,13 @@ function EnrichContent() {
       }
     }
 
+    // Distribute to target profiles
+    if (distTargets.length > 0) {
+      setAutoEnrichPhase("Distributing to other profiles...");
+      const allNoteIds = currentNotes.map((n) => n.noteId);
+      await distribute(allNoteIds, distTargets);
+    }
+
     // Done — build summary
     const textFailed = batchResults.filter((r) => r.error).length;
     const audioFailed = currentNotes.length - audioResults.length;
@@ -1087,7 +1130,7 @@ function EnrichContent() {
     setBatchEnriching(false);
     setBatchProgress("");
     fetchNotes();
-  }, [fetchNotes]);
+  }, [fetchNotes, distTargets, distribute]);
 
   // Trigger auto-enrich when notes loaded and autoEnrich param present
   useEffect(() => {
@@ -1168,6 +1211,15 @@ function EnrichContent() {
         >
           <RefreshCw className="h-3 w-3" /> Refresh
         </button>
+      </div>
+
+      {/* Distribution targets */}
+      <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/30 p-3">
+        <DistributionTargets
+          selected={distTargets}
+          onChange={setDistTargets}
+        />
+        <DistributionStatus results={distResults} loading={distributing} />
       </div>
 
       {/* Batch toolbar */}

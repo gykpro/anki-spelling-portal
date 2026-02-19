@@ -9,6 +9,7 @@ import {
   PenLine,
   Settings,
 } from "lucide-react";
+import { ProfileIndicator } from "@/components/shared/ProfileIndicator";
 
 export const metadata: Metadata = {
   title: "Anki Spelling Portal",
@@ -35,10 +36,11 @@ export default function RootLayout({
         <div className="flex min-h-screen">
           {/* Sidebar */}
           <aside className="flex w-56 flex-col border-r border-border bg-muted/30">
-            <div className="flex h-14 items-center border-b border-border px-4">
+            <div className="border-b border-border px-4 py-2.5">
               <h1 className="text-sm font-bold tracking-tight">
                 Spelling Portal
               </h1>
+              <ProfileIndicator />
             </div>
             <nav className="flex-1 p-2">
               {navItems.map((item) => (

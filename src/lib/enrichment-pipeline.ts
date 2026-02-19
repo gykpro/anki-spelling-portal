@@ -3,8 +3,9 @@
  * Used by both API routes and Telegram bot.
  */
 import { runAI, runAIVision, type ImageInput } from "@/lib/ai";
-import { ankiConnect } from "@/lib/anki-connect";
+import { ankiConnect, withProfileLock } from "@/lib/anki-connect";
 import { getConfig } from "@/lib/settings";
+import type { DistributeResult } from "@/types/anki";
 import {
   type TextEnrichField,
   getFieldDescriptions,
@@ -466,6 +467,20 @@ export async function runFullPipeline(
     }
   }
 
+  // 7. Distribute to target profiles
+  const allNoteIds = created.map((c) => c.noteId);
+  try {
+    const distResults = await distributeNotes(allNoteIds, progress);
+    const distSummary = distResults
+      .map((r) => `${r.profile}: ${r.success ? `${r.notesDistributed} distributed` : r.error}`)
+      .join(", ");
+    if (distSummary) {
+      await progress.update(`Distribution: ${distSummary}`);
+    }
+  } catch (err) {
+    errors.push(`Distribution: ${err instanceof Error ? err.message : String(err)}`);
+  }
+
   return { created: created.length, duplicates: dupes.size, errors };
 }
 
@@ -622,7 +637,130 @@ export async function runFullPipelineFromExtraction(
     }
   }
 
+  // 7. Distribute to target profiles
+  const allCreatedIds = created.map((c) => c.noteId);
+  try {
+    const distResults = await distributeNotes(allCreatedIds, progress);
+    const distSummary = distResults
+      .map((r) => `${r.profile}: ${r.success ? `${r.notesDistributed} distributed` : r.error}`)
+      .join(", ");
+    if (distSummary) {
+      await progress.update(`Distribution: ${distSummary}`);
+    }
+  } catch (err) {
+    errors.push(`Distribution: ${err instanceof Error ? err.message : String(err)}`);
+  }
+
   return { created: created.length, duplicates: dupes.size, errors };
+}
+
+// ─── Distribution to other profiles ───
+
+const DECK_NAME = "Gao English Spelling";
+const MODEL_NAME = "school spelling";
+
+/** Distribute notes to configured target profiles (server-side) */
+export async function distributeNotes(
+  noteIds: number[],
+  progress?: PipelineProgress
+): Promise<DistributeResult[]> {
+  const distConfig = getConfig("DISTRIBUTION_PROFILES");
+  if (!distConfig) return [];
+
+  const targetProfiles = distConfig.split(",").map((s) => s.trim()).filter(Boolean);
+  if (targetProfiles.length === 0) return [];
+
+  const homeProfile = getConfig("ACTIVE_PROFILE");
+  if (!homeProfile) return [];
+
+  // Fetch source notes
+  const sourceNotes = await ankiConnect.notesInfo(noteIds);
+  if (sourceNotes.length === 0) return [];
+
+  const results: DistributeResult[] = [];
+
+  for (const targetProfile of targetProfiles) {
+    if (targetProfile === homeProfile) continue;
+
+    if (progress) {
+      await progress.update(`Distributing to ${targetProfile}...`);
+    }
+
+    const result = await withProfileLock(async () => {
+      try {
+        await ankiConnect.loadProfileAndWait(targetProfile);
+
+        const decks = await ankiConnect.deckNames();
+        if (!decks.includes(DECK_NAME)) {
+          await ankiConnect.loadProfileAndWait(homeProfile);
+          return {
+            profile: targetProfile,
+            success: false,
+            error: `Deck "${DECK_NAME}" not found`,
+            notesDistributed: 0,
+          };
+        }
+
+        const models = await ankiConnect.modelNames();
+        if (!models.includes(MODEL_NAME)) {
+          await ankiConnect.loadProfileAndWait(homeProfile);
+          return {
+            profile: targetProfile,
+            success: false,
+            error: `Note type "${MODEL_NAME}" not found`,
+            notesDistributed: 0,
+          };
+        }
+
+        let distributed = 0;
+
+        for (const note of sourceNotes) {
+          const fields: Record<string, string> = {};
+          for (const [key, val] of Object.entries(note.fields)) {
+            fields[key] = val.value;
+          }
+
+          const uuid = fields["Note ID"];
+          if (!uuid) continue;
+
+          const existing = await ankiConnect.findNotes(
+            `deck:"${DECK_NAME}" "Note ID:${uuid}"`
+          );
+
+          if (existing.length > 0) {
+            await ankiConnect.updateNoteFields({ id: existing[0], fields });
+          } else {
+            try {
+              await ankiConnect.addNote({
+                deckName: DECK_NAME,
+                modelName: MODEL_NAME,
+                fields,
+                tags: note.tags,
+              });
+            } catch {
+              continue;
+            }
+          }
+          distributed++;
+        }
+
+        await ankiConnect.loadProfileAndWait(homeProfile);
+        return { profile: targetProfile, success: true, notesDistributed: distributed };
+      } catch (err) {
+        try { await ankiConnect.loadProfileAndWait(homeProfile); } catch { /* ignore */ }
+        return {
+          profile: targetProfile,
+          success: false,
+          error: err instanceof Error ? err.message : "Distribution failed",
+          notesDistributed: 0,
+        };
+      }
+    });
+
+    results.push(result);
+  }
+
+  return results;
 }
 
 /** Extract worksheet data from images using AI Vision */

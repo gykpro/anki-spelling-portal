@@ -45,3 +45,10 @@ export interface UpdateNoteParams {
   id: number;
   fields: Partial<SpellingNoteFields>;
 }
+
+export interface DistributeResult {
+  profile: string;
+  success: boolean;
+  error?: string;
+  notesDistributed: number;
+}

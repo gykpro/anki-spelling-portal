@@ -585,6 +585,78 @@ These tests verify the skill scripts work correctly via command line.
 
 ---
 
+## 11. Multi-Profile Distribution
+
+### Pre-requisites
+- Anki running with at least 2 profiles (e.g., "User1" and "User2")
+- Both profiles have the "Gao English Spelling" deck and "school spelling" note type pre-configured
+- Dev server running on `localhost:3000`
+
+### 11a. Settings — Profile section
+- Navigate to `/settings`
+- Scroll to "Anki Profiles" section — verify it shows with Users icon
+- Verify "Active Profile" shows all available Anki profiles as buttons
+- Verify one profile is highlighted as active
+- Verify "Distribution Targets" shows all profiles except the active one as toggleable chips
+- Click a distribution target to select it — verify it turns blue with checkmark
+- Click "Save Distribution Targets" — verify "Saved" confirmation
+
+### 11b. Settings — Profile switch
+- Click a different profile in the "Active Profile" row
+- Verify the active profile changes
+- Verify "Distribution Targets" updates to exclude the newly active profile
+
+### 11c. Sidebar — Profile indicator
+- Verify the sidebar header shows the current profile name below "Spelling Portal"
+- Verify a user icon and dropdown chevron appear
+- Click the profile indicator — verify dropdown with all profiles appears
+- Click a different profile — verify page reloads with new profile active
+
+### 11d. Quick Add — Distribution
+- Navigate to `/quick-add`
+- Verify "Distribute to:" row appears below the textarea (only if distribution targets configured)
+- Verify target profile chips are pre-selected
+- Enter test word: `__test_multiprofile_qa`
+- Click submit — verify success message
+- Verify "Distributing..." status appears, then changes to profile results with checkmarks
+- Switch to the target profile (via sidebar or settings)
+- Navigate to Browse, search for `__test_multiprofile_qa`
+- Verify the card exists in the target profile with same Word and Note ID
+
+### 11e. Enrich — Distribution on save
+- Switch back to the primary profile
+- Navigate to Enrich with a test card that has empty fields
+- Verify "Distribute to:" row appears above the batch toolbar
+- Generate text fields for the card, then click "Save to Anki"
+- Verify distribution status shows results
+- Switch to target profile, verify the card has the enriched fields
+
+### 11f. Enrich — Save All distribution
+- Switch back to primary profile
+- On Enrich page with multiple cards with generated results
+- Click "Save All"
+- Verify distribution occurs after all saves
+- Verify distribution status shows
+
+### 11g. Quick Add — No distribution targets
+- Remove all distribution targets from Settings (save empty)
+- Navigate to Quick Add
+- Verify "Distribute to:" row does NOT appear
+- Submit words — verify no distribution attempt
+
+### 11h. Cleanup
+- Delete all `__test_multiprofile*` notes from all profiles:
+  - Switch to each profile via Settings or sidebar
+  - Find and delete notes with `__test_multiprofile` prefix:
+    ```
+    curl -s http://localhost:8765 -X POST \
+      -d '{"action":"findNotes","version":6,"params":{"query":"deck:\"Gao English Spelling\" __test_multiprofile*"}}'
+    ```
+  - Delete found note IDs via deleteNotes
+- Remove distribution targets from Settings
+
+---
+
 ## Notes
 
 - Test words use `__test_` prefix for easy identification and cleanup

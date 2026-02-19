@@ -13,6 +13,8 @@ import {
   Terminal,
   Zap,
   MessageCircle,
+  Users,
+  RefreshCw,
 } from "lucide-react";
 
 interface ConfigStatus {
@@ -32,7 +34,9 @@ type ConfigKey =
   | "ANKI_CONNECT_URL"
   | "AI_BACKEND"
   | "TELEGRAM_BOT_TOKEN"
-  | "TELEGRAM_ALLOWED_USERS";
+  | "TELEGRAM_ALLOWED_USERS"
+  | "DISTRIBUTION_PROFILES"
+  | "ACTIVE_PROFILE";
 
 type SettingsData = Record<ConfigKey, ConfigStatus>;
 
@@ -74,6 +78,8 @@ const KEY_LABELS: Record<ConfigKey, string> = {
   AI_BACKEND: "Backend Mode",
   TELEGRAM_BOT_TOKEN: "Bot Token",
   TELEGRAM_ALLOWED_USERS: "Allowed User IDs",
+  DISTRIBUTION_PROFILES: "Distribution Profiles",
+  ACTIVE_PROFILE: "Active Profile",
 };
 
 const KEY_PLACEHOLDERS: Partial<Record<ConfigKey, string>> = {
@@ -321,6 +327,9 @@ export default function SettingsPage() {
           Leave "Allowed User IDs" empty to allow all users.
         </p>
       </section>
+
+      {/* Anki Profiles Section */}
+      <ProfilesSection />
     </div>
   );
 }
@@ -435,5 +444,230 @@ function SettingsField({
         </p>
       )}
     </div>
+  );
+}
+
+function ProfilesSection() {
+  const [profiles, setProfiles] = useState<string[]>([]);
+  const [active, setActive] = useState<string | null>(null);
+  const [distributionTargets, setDistributionTargets] = useState<Set<string>>(new Set());
+  const [loading, setLoading] = useState(true);
+  const [switching, setSwitching] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveResult, setSaveResult] = useState<"success" | "error" | null>(null);
+
+  const fetchProfiles = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [profileRes, settingsRes] = await Promise.all([
+        fetch("/api/anki/profiles"),
+        fetch("/api/settings"),
+      ]);
+      const profileData = await profileRes.json();
+      const settingsData = await settingsRes.json();
+
+      setProfiles(profileData.profiles || []);
+      setActive(profileData.active || null);
+
+      // Parse current distribution targets
+      const distValue = settingsData.settings?.DISTRIBUTION_PROFILES?.maskedValue || "";
+      if (distValue) {
+        setDistributionTargets(
+          new Set(distValue.split(",").map((s: string) => s.trim()).filter(Boolean))
+        );
+      }
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchProfiles();
+  }, [fetchProfiles]);
+
+  const switchProfile = async (name: string) => {
+    if (name === active) return;
+    setSwitching(true);
+    try {
+      const res = await fetch("/api/anki/profiles", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      if (res.ok) {
+        setActive(name);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setSwitching(false);
+    }
+  };
+
+  const toggleTarget = (profile: string) => {
+    setDistributionTargets((prev) => {
+      const next = new Set(prev);
+      if (next.has(profile)) {
+        next.delete(profile);
+      } else {
+        next.add(profile);
+      }
+      return next;
+    });
+  };
+
+  const saveTargets = async () => {
+    setSaving(true);
+    setSaveResult(null);
+    try {
+      const value = Array.from(distributionTargets).join(", ");
+      const res = await fetch("/api/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ settings: { DISTRIBUTION_PROFILES: value } }),
+      });
+      const data = await res.json();
+      if (data.saved) {
+        setSaveResult("success");
+        setTimeout(() => setSaveResult(null), 3000);
+      } else {
+        setSaveResult("error");
+      }
+    } catch {
+      setSaveResult("error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <section className="rounded-lg border border-border p-5 space-y-4">
+        <div className="flex items-center gap-2">
+          <Users className="h-5 w-5 text-violet-500" />
+          <h2 className="text-lg font-semibold">Anki Profiles</h2>
+        </div>
+        <div className="flex justify-center py-4">
+          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+        </div>
+      </section>
+    );
+  }
+
+  if (profiles.length === 0) {
+    return (
+      <section className="rounded-lg border border-border p-5 space-y-4">
+        <div className="flex items-center gap-2">
+          <Users className="h-5 w-5 text-violet-500" />
+          <div>
+            <h2 className="text-lg font-semibold">Anki Profiles</h2>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              No profiles found. Make sure Anki is running with AnkiConnect.
+            </p>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  const otherProfiles = profiles.filter((p) => p !== active);
+
+  return (
+    <section className="rounded-lg border border-border p-5 space-y-4">
+      <div className="flex items-center gap-2">
+        <Users className="h-5 w-5 text-violet-500" />
+        <div>
+          <h2 className="text-lg font-semibold">Anki Profiles</h2>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Switch active profile and configure card distribution to other profiles.
+          </p>
+        </div>
+      </div>
+
+      {/* Active Profile */}
+      <div className="space-y-2">
+        <label className="text-sm font-medium">Active Profile</label>
+        <div className="flex flex-wrap gap-2">
+          {profiles.map((p) => (
+            <button
+              key={p}
+              onClick={() => switchProfile(p)}
+              disabled={switching}
+              className={`rounded-lg border-2 px-4 py-2 text-sm transition-colors ${
+                p === active
+                  ? "border-primary bg-primary/5 font-medium"
+                  : "border-border hover:border-muted-foreground/30"
+              } ${switching ? "opacity-50 cursor-wait" : ""}`}
+            >
+              {p}
+              {p === active && (
+                <span className="ml-2 text-xs text-success">(active)</span>
+              )}
+            </button>
+          ))}
+          <button
+            onClick={fetchProfiles}
+            disabled={loading}
+            className="inline-flex items-center gap-1 rounded-lg border-2 border-dashed border-border px-3 py-2 text-xs text-muted-foreground hover:bg-muted"
+          >
+            <RefreshCw className="h-3 w-3" /> Refresh
+          </button>
+        </div>
+      </div>
+
+      {/* Distribution Targets */}
+      {otherProfiles.length > 0 && (
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Distribution Targets</label>
+          <p className="text-xs text-muted-foreground">
+            Cards created or enriched in the active profile will be automatically distributed to selected profiles.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {otherProfiles.map((p) => (
+              <button
+                key={p}
+                onClick={() => toggleTarget(p)}
+                className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition-colors ${
+                  distributionTargets.has(p)
+                    ? "border-primary bg-primary/10 text-primary font-medium"
+                    : "border-border text-muted-foreground hover:bg-muted"
+                }`}
+              >
+                {distributionTargets.has(p) && (
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                )}
+                {p}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center gap-3 pt-1">
+            <button
+              onClick={saveTargets}
+              disabled={saving}
+              className="inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
+            >
+              {saving ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Save className="h-3.5 w-3.5" />
+              )}
+              {saving ? "Saving..." : "Save Distribution Targets"}
+            </button>
+            {saveResult === "success" && (
+              <span className="flex items-center gap-1 text-xs text-green-600">
+                <CheckCircle2 className="h-3.5 w-3.5" /> Saved
+              </span>
+            )}
+            {saveResult === "error" && (
+              <span className="flex items-center gap-1 text-xs text-red-600">
+                <XCircle className="h-3.5 w-3.5" /> Failed
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+    </section>
   );
 }

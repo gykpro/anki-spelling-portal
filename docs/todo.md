@@ -14,6 +14,9 @@
 
 ## Pending
 
+## Recently Completed
+- [x] **Multi-Profile Distribution** — Switch active Anki profile from the portal sidebar/settings, and distribute cards (on create and on enrich) to other profiles automatically. Profile switcher in sidebar, distribution target config in Settings, auto-distribute on Quick Add, Enrich save, and Telegram bot pipeline.
+
 ## Infrastructure
 - [x] **Docker + NAS Deployment** — Replaced Claude CLI with Anthropic SDK, added Dockerfile, docker-compose.yml (headless Anki + portal), NAS setup guide. Enables 24/7 operation on Synology NAS.
 - [x] **Settings Page + Dual AI Backend** — Settings page at `/settings` to manage API keys and config. Dual AI backend: SDK (Anthropic API, pay-per-use) and CLI (Claude Code with Max subscription). Settings stored in `./data/secrets.json`, secrets never exposed via API.
