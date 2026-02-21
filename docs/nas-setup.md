@@ -62,14 +62,19 @@ Keys are stored in the `portal-data` Docker volume and persist across restarts.
 
 ### 3. Initial AnkiWeb sync (first run)
 
-On first run, you need to sync with AnkiWeb to pull your existing cards:
+On first run, you need to log in to AnkiWeb via VNC to pull your existing cards:
+
+1. Edit `docker-compose.yml`: change `QT_QPA_PLATFORM` to `vnc` and uncomment port `5900`
+2. Restart the anki container: `docker compose up -d anki`
+3. Connect with a VNC client (e.g., macOS Screen Sharing) to `<nas-ip>:5900`
+4. In the Anki GUI, click **Sync** and enter your AnkiWeb credentials
+5. Once sync completes, switch `QT_QPA_PLATFORM` back to `offscreen`, comment out port `5900`, and restart: `docker compose up -d anki`
+
+After the initial login, AnkiWeb credentials are stored and future syncs work via the API:
 
 ```bash
-# Trigger sync (will prompt for AnkiWeb credentials on first run)
 curl http://localhost:8765 -d '{"action":"sync","version":6}'
 ```
-
-If the headless Anki doesn't have AnkiWeb credentials yet, you may need to configure them. Check the [headless-anki image docs](https://github.com/thisisnttheway/headless-anki) for setup instructions.
 
 ### 4. Set up periodic sync
 
