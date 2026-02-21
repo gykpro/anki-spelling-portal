@@ -623,20 +623,23 @@ These tests verify the skill scripts work correctly via command line.
 - Navigate to Browse, search for `__test_multiprofile_qa`
 - Verify the card exists in the target profile with same Word and Note ID
 
-### 11e. Enrich — Distribution on save
+### 11e. Enrich — Distribution on save (with media)
 - Switch back to the primary profile
 - Navigate to Enrich with a test card that has empty fields
 - Verify "Distribute to:" row appears above the batch toolbar
-- Generate text fields for the card, then click "Save to Anki"
+- Generate text fields + audio + image for the card, then click "Save to Anki"
 - Verify distribution status shows results
 - Switch to target profile, verify the card has the enriched fields
+- Verify audio plays in the target profile (word audio and sentence audio)
+- Verify image displays in the target profile
 
-### 11f. Enrich — Save All distribution
+### 11f. Enrich — Save All distribution (with media)
 - Switch back to primary profile
-- On Enrich page with multiple cards with generated results
+- On Enrich page with multiple cards with generated results (including audio/images)
 - Click "Save All"
-- Verify distribution occurs after all saves
+- Verify distribution occurs after each individual save (no redundant bulk distribute)
 - Verify distribution status shows
+- Switch to target profile, verify media files (audio, images) work in the target profile
 
 ### 11g. Quick Add — No distribution targets
 - Remove all distribution targets from Settings (save empty)

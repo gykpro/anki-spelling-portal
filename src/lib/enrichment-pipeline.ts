@@ -44,6 +44,10 @@ Rules:
 6. Ignore any dictation section if present — only extract the numbered spelling sentences
 `;
 
+// ─── Media file type ───
+
+export type MediaFile = { filename: string; data: string }; // data = base64
+
 // ─── TTS generation ───
 
 function escapeXml(text: string): string {
@@ -337,12 +341,14 @@ export async function saveTextToAnki(
   }
 }
 
-/** Generate and save audio (word + sentence) for a single note */
+/** Generate and save audio (word + sentence) for a single note. Returns generated media files. */
 export async function generateAndSaveAudio(
   noteId: number,
   word: string,
   sentence?: string
-): Promise<void> {
+): Promise<MediaFile[]> {
+  const mediaFiles: MediaFile[] = [];
+
   // Word audio
   const wordTts = await generateTTS(word, "word");
   const wordFilename = `spelling_${word.replace(/[^a-zA-Z0-9]/g, "_")}_${noteId}.mp3`;
@@ -351,6 +357,7 @@ export async function generateAndSaveAudio(
     id: noteId,
     fields: { Audio: `[sound:${wordFilename}]` },
   });
+  mediaFiles.push({ filename: wordFilename, data: wordTts.base64 });
 
   // Sentence audio (if sentence available)
   if (sentence) {
@@ -362,15 +369,18 @@ export async function generateAndSaveAudio(
       id: noteId,
       fields: { "Main Sentence Audio": `[sound:${sentenceFilename}]` },
     });
+    mediaFiles.push({ filename: sentenceFilename, data: sentenceTts.base64 });
   }
+
+  return mediaFiles;
 }
 
-/** Generate and save image for a single note */
+/** Generate and save image for a single note. Returns generated media files. */
 export async function generateAndSaveImage(
   noteId: number,
   word: string,
   sentence: string
-): Promise<void> {
+): Promise<MediaFile[]> {
   const imgResult = await generateImage(word, stripHtml(sentence));
   const ext = imgResult.mimeType.includes("png") ? "png" : "jpg";
   const filename = `spelling_img_${word.replace(/[^a-zA-Z0-9]/g, "_")}_${noteId}.${ext}`;
@@ -379,6 +389,7 @@ export async function generateAndSaveImage(
     id: noteId,
     fields: { Picture: `<img src="${filename}">` },
   });
+  return [{ filename, data: imgResult.base64 }];
 }
 
 /** Run the full enrichment pipeline for a list of words */
@@ -432,7 +443,8 @@ export async function runFullPipeline(
     }
   }
 
-  // 5. Generate and save audio
+  // 5. Generate and save audio (collect media for distribution)
+  const mediaCache = new Map<string, string>();
   for (let i = 0; i < enrichResults.length; i++) {
     const result = enrichResults[i];
     if (result.error) continue;
@@ -440,17 +452,18 @@ export async function runFullPipeline(
       `Generating audio... ${i + 1}/${enrichResults.length}: ${result.word}`
     );
     try {
-      await generateAndSaveAudio(
+      const mediaFiles = await generateAndSaveAudio(
         result.noteId,
         result.word,
         result.sentence
       );
+      for (const mf of mediaFiles) mediaCache.set(mf.filename, mf.data);
     } catch (err) {
       errors.push(`Audio for "${result.word}": ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 
-  // 6. Generate and save images
+  // 6. Generate and save images (collect media for distribution)
   for (let i = 0; i < enrichResults.length; i++) {
     const result = enrichResults[i];
     if (result.error || !result.sentence) continue;
@@ -458,20 +471,21 @@ export async function runFullPipeline(
       `Generating images... ${i + 1}/${enrichResults.length}: ${result.word}`
     );
     try {
-      await generateAndSaveImage(
+      const mediaFiles = await generateAndSaveImage(
         result.noteId,
         result.word,
         result.sentence
       );
+      for (const mf of mediaFiles) mediaCache.set(mf.filename, mf.data);
     } catch (err) {
       errors.push(`Image for "${result.word}": ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 
-  // 7. Distribute to target profiles
+  // 7. Distribute to target profiles (with media)
   const allNoteIds = created.map((c) => c.noteId);
   try {
-    const distResults = await distributeNotes(allNoteIds, progress);
+    const distResults = await distributeNotes(allNoteIds, progress, mediaCache);
     const distSummary = distResults
       .map((r) => `${r.profile}: ${r.success ? `${r.notesDistributed} distributed` : r.error}`)
       .join(", ");
@@ -612,36 +626,39 @@ export async function runFullPipelineFromExtraction(
     }
   }
 
-  // 5. Generate and save audio
+  // 5. Generate and save audio (collect media for distribution)
+  const mediaCache = new Map<string, string>();
   for (let i = 0; i < created.length; i++) {
     const c = created[i];
     await progress.update(
       `Generating audio... ${i + 1}/${created.length}: ${c.word}`
     );
     try {
-      await generateAndSaveAudio(c.noteId, c.word, c.sentence);
+      const mediaFiles = await generateAndSaveAudio(c.noteId, c.word, c.sentence);
+      for (const mf of mediaFiles) mediaCache.set(mf.filename, mf.data);
     } catch (err) {
       errors.push(`Audio for "${c.word}": ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 
-  // 6. Generate and save images
+  // 6. Generate and save images (collect media for distribution)
   for (let i = 0; i < created.length; i++) {
     const c = created[i];
     await progress.update(
       `Generating images... ${i + 1}/${created.length}: ${c.word}`
     );
     try {
-      await generateAndSaveImage(c.noteId, c.word, c.sentence);
+      const mediaFiles = await generateAndSaveImage(c.noteId, c.word, c.sentence);
+      for (const mf of mediaFiles) mediaCache.set(mf.filename, mf.data);
     } catch (err) {
       errors.push(`Image for "${c.word}": ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 
-  // 7. Distribute to target profiles
+  // 7. Distribute to target profiles (with media)
   const allCreatedIds = created.map((c) => c.noteId);
   try {
-    const distResults = await distributeNotes(allCreatedIds, progress);
+    const distResults = await distributeNotes(allCreatedIds, progress, mediaCache);
     const distSummary = distResults
       .map((r) => `${r.profile}: ${r.success ? `${r.notesDistributed} distributed` : r.error}`)
       .join(", ");
@@ -663,7 +680,8 @@ const MODEL_NAME = "school spelling";
 /** Distribute notes to configured target profiles (server-side) */
 export async function distributeNotes(
   noteIds: number[],
-  progress?: PipelineProgress
+  progress?: PipelineProgress,
+  mediaCache?: Map<string, string>
 ): Promise<DistributeResult[]> {
   const distConfig = getConfig("DISTRIBUTION_PROFILES");
   if (!distConfig) return [];
@@ -716,6 +734,18 @@ export async function distributeNotes(
             error: `Note type "${MODEL_NAME}" not found`,
             notesDistributed: 0,
           };
+        }
+
+        // Store media files in target profile
+        if (mediaCache && mediaCache.size > 0) {
+          console.log(`[Distribution] Storing ${mediaCache.size} media files in "${targetProfile}"...`);
+          for (const [filename, data] of mediaCache) {
+            try {
+              await ankiConnect.storeMediaFile(filename, data);
+            } catch (err) {
+              console.warn(`[Distribution] Failed to store media "${filename}" in "${targetProfile}":`, err);
+            }
+          }
         }
 
         let distributed = 0;

@@ -15,6 +15,9 @@
 ## Pending
 
 ## Recently Completed
+- [x] **Distribute Media Files to All Profiles** — Media files (audio MP3s, images) are now stored in each target profile's `collection.media/` during distribution, fixing broken audio/images in non-home profiles.
+- [x] **CI/CD Docker Image Builds** — GitHub Actions workflow (`.github/workflows/docker.yml`) auto-builds and pushes Docker image to `ghcr.io` on version tag push. `release.sh` updated to auto-push tags to origin.
+- [x] **Ignore Dictation in Extraction** — Added rule to extraction prompt to skip dictation sections and only extract numbered spelling sentences.
 - [x] **Release Process** — `scripts/release.sh` automates versioning, Docker image build, skill tarball packaging, and git tagging.
 - [x] **Multi-Profile Distribution** — Switch active Anki profile from the portal sidebar/settings, and distribute cards (on create and on enrich) to other profiles automatically. Profile switcher in sidebar, distribution target config in Settings, auto-distribute on Quick Add, Enrich save, and Telegram bot pipeline.
 

@@ -9,13 +9,23 @@ const MODEL_NAME = "school spelling";
 /** POST: Distribute notes from current profile to target profiles */
 export async function POST(request: NextRequest) {
   try {
-    const { noteIds, targetProfiles } = await request.json();
+    const { noteIds, targetProfiles, mediaFiles } = await request.json();
 
     if (!noteIds?.length || !targetProfiles?.length) {
       return NextResponse.json(
         { error: "noteIds and targetProfiles are required" },
         { status: 400 }
       );
+    }
+
+    // Build media cache from optional mediaFiles array
+    const mediaCache = new Map<string, string>();
+    if (Array.isArray(mediaFiles)) {
+      for (const mf of mediaFiles) {
+        if (mf.filename && mf.data) {
+          mediaCache.set(mf.filename, mf.data);
+        }
+      }
     }
 
     // Fetch source notes from current profile
@@ -67,6 +77,17 @@ export async function POST(request: NextRequest) {
               error: `Note type "${MODEL_NAME}" not found in profile "${targetProfile}"`,
               notesDistributed: 0,
             };
+          }
+
+          // Store media files in target profile
+          if (mediaCache.size > 0) {
+            for (const [filename, data] of mediaCache) {
+              try {
+                await ankiConnect.storeMediaFile(filename, data);
+              } catch (err) {
+                console.warn(`[Distribute] Failed to store media "${filename}" in ${targetProfile}:`, err);
+              }
+            }
           }
 
           let distributed = 0;

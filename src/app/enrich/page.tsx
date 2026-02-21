@@ -380,15 +380,19 @@ function EnrichContent() {
   const [distResults, setDistResults] = useState<DistributeResult[] | null>(null);
   const [distributing, setDistributing] = useState(false);
 
-  const distribute = useCallback(async (noteIds: number[], targets: string[]) => {
+  const distribute = useCallback(async (noteIds: number[], targets: string[], mediaFiles?: { filename: string; data: string }[]) => {
     if (noteIds.length === 0 || targets.length === 0) return;
     setDistributing(true);
     setDistResults(null);
     try {
+      const body: Record<string, unknown> = { noteIds, targetProfiles: targets };
+      if (mediaFiles && mediaFiles.length > 0) {
+        body.mediaFiles = mediaFiles;
+      }
       const res = await fetch("/api/anki/distribute", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ noteIds, targetProfiles: targets }),
+        body: JSON.stringify(body),
       });
       if (res.ok) {
         const data = await res.json();
@@ -596,6 +600,29 @@ function EnrichContent() {
 
     if (Object.keys(fields).length === 0) return;
 
+    // Collect media files for distribution
+    const mediaFiles: { filename: string; data: string }[] = [];
+
+    if (r.image && typeof r.image === "object") {
+      const img = r.image as { base64: string; mimeType: string };
+      const ext = img.mimeType.includes("png") ? "png" : "jpg";
+      const cleanWord = getFieldValue(note, "Word").replace(/\s+/g, "_");
+      const imgFilename = `spelling_${cleanWord}_${noteId}.${ext}`;
+      mediaFiles.push({ filename: imgFilename, data: img.base64 });
+    }
+    if (r.audio && typeof r.audio === "object") {
+      const audio = r.audio as { base64: string };
+      const cleanWord = getFieldValue(note, "Word").replace(/\s+/g, "_");
+      const audioFilename = `spelling_${cleanWord}_${noteId}.mp3`;
+      mediaFiles.push({ filename: audioFilename, data: audio.base64 });
+    }
+    if (r.sentence_audio && typeof r.sentence_audio === "object") {
+      const audio = r.sentence_audio as { base64: string };
+      const cleanWord = getFieldValue(note, "Word").replace(/\s+/g, "_");
+      const sentAudioFilename = `spelling_${cleanWord}_${noteId}_sentence.mp3`;
+      mediaFiles.push({ filename: sentAudioFilename, data: audio.base64 });
+    }
+
     try {
       const res = await fetch(`/api/anki/notes/${noteId}`, {
         method: "PUT",
@@ -610,9 +637,9 @@ function EnrichContent() {
         [noteId]: { ...prev[noteId], saved: true },
       }));
 
-      // Distribute to target profiles
+      // Distribute to target profiles (with media)
       if (distTargets.length > 0) {
-        distribute([noteId], distTargets);
+        distribute([noteId], distTargets, mediaFiles.length > 0 ? mediaFiles : undefined);
       }
 
       // Refresh the note data
@@ -762,11 +789,6 @@ function EnrichContent() {
 
     setBatchProgress(`All ${savedCount} cards saved`);
     setSavingAll(false);
-
-    // Distribute all saved notes
-    if (distTargets.length > 0 && unsavedNoteIds.length > 0) {
-      distribute(unsavedNoteIds, distTargets);
-    }
   };
 
   const generateAllAudio = async () => {
@@ -1064,9 +1086,10 @@ function EnrichContent() {
       }
     }
 
-    // Phase 4: Save audio to Anki
+    // Phase 4: Save audio to Anki (collect media for distribution)
     setAutoEnrichPhase("Saving audio...");
     let audioSaved = 0;
+    const collectedMedia: { filename: string; data: string }[] = [];
 
     for (const { noteId, word, data } of audioResults) {
       const fields: Record<string, string> = {};
@@ -1082,6 +1105,7 @@ function EnrichContent() {
             body: JSON.stringify({ filename, data: audio.base64 }),
           });
           fields["Audio"] = `[sound:${filename}]`;
+          collectedMedia.push({ filename, data: audio.base64 });
         } catch { /* skip */ }
       }
 
@@ -1095,6 +1119,7 @@ function EnrichContent() {
             body: JSON.stringify({ filename, data: audio.base64 }),
           });
           fields["Main Sentence Audio"] = `[sound:${filename}]`;
+          collectedMedia.push({ filename, data: audio.base64 });
         } catch { /* skip */ }
       }
 
@@ -1111,12 +1136,12 @@ function EnrichContent() {
       }
     }
 
-    // Distribute to target profiles
+    // Distribute to target profiles (with media)
     const targets = distTargetsRef.current;
     if (targets.length > 0) {
       setAutoEnrichPhase("Distributing to other profiles...");
       const allNoteIds = currentNotes.map((n) => n.noteId);
-      await distribute(allNoteIds, targets);
+      await distribute(allNoteIds, targets, collectedMedia.length > 0 ? collectedMedia : undefined);
     }
 
     // Done — build summary
