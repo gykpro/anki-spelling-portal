@@ -41,6 +41,7 @@ Rules:
 3. For each numbered sentence (1-10), copy it EXACTLY and identify the bold/underlined word or phrase
 4. The underlined text may be a single word or a multi-word phrase - extract the ENTIRE underlined portion
 5. Return ONLY valid JSON, nothing else
+6. Ignore any dictation section if present — only extract the numbered spelling sentences
 `;
 
 // ─── TTS generation ───
