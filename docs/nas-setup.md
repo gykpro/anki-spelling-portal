@@ -95,6 +95,18 @@ Or keep using local Anki (synced via AnkiWeb) — the default `http://localhost:
 
 ## Updating
 
+### Option A: Pre-built image from Docker Hub (recommended)
+
+```bash
+cd /volume1/docker/spelling-portal
+docker pull gykpro/anki-spelling-portal:latest
+docker compose up -d portal
+```
+
+To use the pre-built image, uncomment the `image:` line and comment out `build: .` in `docker-compose.yml`.
+
+### Option B: Build from source
+
 ```bash
 cd /volume1/docker/spelling-portal
 git pull

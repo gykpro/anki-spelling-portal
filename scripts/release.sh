@@ -87,7 +87,7 @@ ok "Tagged v$VERSION"
 # --- Step 5: Push tag to trigger CI build ---
 info "Pushing tag to origin..."
 git push origin master --tags > /dev/null 2>&1
-ok "Pushed to origin (CI will build ghcr.io image)"
+ok "Pushed to origin (CI will build Docker Hub image)"
 
 # --- Summary ---
 echo ""
@@ -95,7 +95,7 @@ echo -e "${GREEN}=== Release v$VERSION complete ===${NC}"
 echo ""
 echo "Artifacts:"
 echo "  Docker image:  anki-spelling-portal:v$VERSION (local)"
-echo "  CI image:      ghcr.io/gykpro/anki-spelling-portal:$VERSION (building...)"
+echo "  CI image:      gykpro/anki-spelling-portal:$VERSION (building...)"
 echo "  Skill tarball: releases/$TARBALL_NAME.tar.gz"
 echo "  Git tag:       v$VERSION"
 echo ""
