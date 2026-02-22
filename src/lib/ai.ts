@@ -1,6 +1,6 @@
 import { getConfig, getAIBackend } from "./settings";
 import { runAnthropic, runAnthropicJSON, runAnthropicVision } from "./anthropic";
-import { runClaude, runClaudeJSON } from "./claude-cli";
+import { runClaude, runClaudeJSON, runClaudeVision } from "./claude-cli";
 
 export type ImageInput = {
   base64: string;
@@ -35,20 +35,18 @@ export async function runAIJSON<T = unknown>(prompt: string): Promise<T> {
   return runClaudeJSON<T>(prompt);
 }
 
-/** Run a multimodal vision prompt. SDK only — CLI falls back to SDK with error if no API key. */
+/** Run a multimodal vision prompt. Uses SDK (base64) or CLI (temp files + Read tool). */
 export async function runAIVision<T = unknown>(
   prompt: string,
   images: ImageInput[]
 ): Promise<T> {
   const backend = ensureBackend();
   if (backend === "cli") {
-    // Vision requires SDK — check if API key is also available
+    // Prefer SDK if API key is available (faster, no temp files)
     if (getConfig("ANTHROPIC_API_KEY")) {
       return runAnthropicVision<T>(prompt, images);
     }
-    throw new Error(
-      "Image/PDF extraction requires an Anthropic API key. Add one in Settings (required even in CLI mode)."
-    );
+    return runClaudeVision<T>(prompt, images);
   }
   return runAnthropicVision<T>(prompt, images);
 }

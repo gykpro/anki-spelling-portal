@@ -1,4 +1,7 @@
 import { spawn } from "child_process";
+import { writeFile, unlink, mkdtemp, rmdir } from "fs/promises";
+import { tmpdir } from "os";
+import { join } from "path";
 import { getConfig } from "./settings";
 
 /**
@@ -92,4 +95,63 @@ export async function runClaudeJSON<T = unknown>(prompt: string, options?: {
   }
 
   return JSON.parse(jsonStr);
+}
+
+const MEDIA_EXTENSIONS: Record<string, string> = {
+  "image/png": ".png",
+  "image/jpeg": ".jpg",
+  "image/gif": ".gif",
+  "image/webp": ".webp",
+  "application/pdf": ".pdf",
+};
+
+/**
+ * Run Claude CLI with images/PDFs by writing them to temp files
+ * and letting Claude's Read tool access them. Returns parsed JSON.
+ */
+export async function runClaudeVision<T = unknown>(
+  prompt: string,
+  images: { base64: string; mediaType: string }[]
+): Promise<T> {
+  const tmpDir = await mkdtemp(join(tmpdir(), "claude-vision-"));
+  const tmpFiles: string[] = [];
+
+  try {
+    // Write each image/PDF to a temp file
+    for (let i = 0; i < images.length; i++) {
+      const ext = MEDIA_EXTENSIONS[images[i].mediaType] || ".bin";
+      const filePath = join(tmpDir, `input_${i}${ext}`);
+      await writeFile(filePath, Buffer.from(images[i].base64, "base64"));
+      tmpFiles.push(filePath);
+    }
+
+    // Build prompt that references the temp files
+    const fileList = tmpFiles
+      .map((f, i) => `File ${i + 1}: ${f}`)
+      .join("\n");
+
+    const fullPrompt =
+      `Read the following file(s) and then follow the instructions below.\n\n` +
+      `${fileList}\n\n` +
+      `Instructions:\n${prompt}`;
+
+    const resultText = await runClaude(fullPrompt, {
+      timeout: 180_000,
+      maxBudget: 10,
+      allowedTools: ["Read"],
+    });
+
+    let jsonStr = resultText.trim();
+    if (jsonStr.startsWith("```")) {
+      jsonStr = jsonStr.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
+    }
+
+    return JSON.parse(jsonStr);
+  } finally {
+    // Clean up temp files
+    for (const f of tmpFiles) {
+      await unlink(f).catch(() => {});
+    }
+    await rmdir(tmpDir).catch(() => {});
+  }
 }
