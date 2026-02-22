@@ -15,17 +15,13 @@ ENV NODE_ENV=production
 RUN apt-get update && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Create non-root user (Claude CLI refuses bypassPermissions as root)
-RUN groupadd -r portal && useradd -r -g portal -d /app portal
-
-# Install Claude Code CLI as the non-root user
-USER portal
-RUN curl -fsSL https://claude.ai/install.sh | bash
-ENV PATH="/app/.local/bin:${PATH}"
+# Install Claude Code CLI globally (as root), then symlink to /usr/local/bin
+RUN curl -fsSL https://claude.ai/install.sh | bash \
+    && ln -s /root/.local/bin/claude /usr/local/bin/claude
 ENV DISABLE_AUTOUPDATER=1
 
-# Switch back to root to copy files and set permissions
-USER root
+# Create non-root user (Claude CLI refuses bypassPermissions as root)
+RUN groupadd -r portal && useradd -r -g portal -d /home/portal -m portal
 
 # Create persistent data directory for settings
 RUN mkdir -p /app/data
