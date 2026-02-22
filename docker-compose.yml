@@ -3,15 +3,13 @@ services:
     image: thisisnttheway/headless-anki:latest
     container_name: anki-headless
     environment:
-      # For first-time AnkiWeb login: change to "vnc", uncomment port 5900,
-      # connect via VNC client, sync, then switch back to "offscreen".
-      QT_QPA_PLATFORM: offscreen
+      QT_QPA_PLATFORM: vnc
       ANKICONNECT_WILDCARD_ORIGIN: "1"
     volumes:
       - anki-data:/data
     ports:
       - "8765:8765"
-      # - "5900:5900"  # VNC — uncomment for first-time AnkiWeb login
+      - "5900:5900"  # VNC — for AnkiWeb login and debugging
     restart: unless-stopped
     mem_limit: 512m
 

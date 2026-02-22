@@ -45,11 +45,11 @@ You need one of these for text enrichment and worksheet extraction:
 | Option | Key | Cost | Vision support | How to get |
 |--------|-----|------|---------------|------------|
 | **SDK** (recommended) | `ANTHROPIC_API_KEY` | Pay-per-use | Yes | [console.anthropic.com](https://console.anthropic.com) → API Keys |
-| **CLI** | `CLAUDE_CODE_OAUTH_TOKEN` | Free (Max subscription) | No (text only) | Run `claude setup-token` on your local machine, copy the token |
+| **CLI** | `CLAUDE_CODE_OAUTH_TOKEN` | Free (Max subscription) | Yes | Run `claude setup-token` on your local machine, copy the token |
 
 Set **Backend Mode** to "Auto" (default) to use SDK if available, else fall back to CLI.
 
-> **Note:** The CLI option requires a Claude Max subscription ($100/month or $200/month). It uses the Claude Code CLI protocol — run `claude setup-token` on any machine with Claude Code installed, then paste the resulting token into the Settings page. Vision/extraction features (worksheet photos) require the SDK option.
+> **Note:** The CLI option requires a Claude Max subscription ($100/month or $200/month). It uses the Claude Code CLI protocol — run `claude setup-token` on any machine with Claude Code installed, then paste the resulting token into the Settings page.
 
 #### Other services
 
@@ -64,17 +64,17 @@ Keys are stored in the `portal-data` Docker volume and persist across restarts.
 
 On first run, you need to log in to AnkiWeb via VNC to pull your existing cards:
 
-1. Edit `docker-compose.yml`: change `QT_QPA_PLATFORM` to `vnc` and uncomment port `5900`
-2. Restart the anki container: `docker compose up -d anki`
-3. Connect with a VNC client (e.g., macOS Screen Sharing) to `<nas-ip>:5900`
-4. In the Anki GUI, click **Sync** and enter your AnkiWeb credentials
-5. Once sync completes, switch `QT_QPA_PLATFORM` back to `offscreen`, comment out port `5900`, and restart: `docker compose up -d anki`
+1. Connect with a VNC client (e.g., macOS Screen Sharing) to `<nas-ip>:5900`
+2. In the Anki GUI, click **Sync** and enter your AnkiWeb credentials
+3. Once sync completes, you're done — VNC stays available for future access
 
 After the initial login, AnkiWeb credentials are stored and future syncs work via the API:
 
 ```bash
 curl http://localhost:8765 -d '{"action":"sync","version":6}'
 ```
+
+> **Saving memory:** If you don't need VNC after the initial login, you can set `QT_QPA_PLATFORM: offscreen` and remove the `5900` port mapping in `docker-compose.yml` to reduce memory usage.
 
 ### 4. Set up periodic sync
 

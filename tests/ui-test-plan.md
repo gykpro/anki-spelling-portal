@@ -22,7 +22,7 @@ Before running tests, configure all API keys via the **Settings page** (`/settin
 | Gemini API | `NANO_BANANA_API_KEY` | Sections 4e, 4p (image generation) | [aistudio.google.com](https://aistudio.google.com) |
 | Telegram Bot | `TELEGRAM_BOT_TOKEN` | Section 9 (Telegram bot) | [@BotFather](https://t.me/BotFather) on Telegram |
 
-**AI Backend notes:** You need either option A (SDK) or option B (CLI), not both. SDK supports all features including vision extraction. CLI supports text enrichment only (vision/extraction still requires SDK). Configure via Settings page > AI Backend section.
+**AI Backend notes:** You need either option A (SDK) or option B (CLI), not both. Both support all features including vision extraction. Configure via Settings page > AI Backend section.
 
 **Note:** API keys are stored in `data/secrets.json` (managed by the Settings page). Environment variables are NOT used for API keys — only `ANKI_CONNECT_URL` can be set via env (for Docker).
 
@@ -40,7 +40,7 @@ Before running tests, configure all API keys via the **Settings page** (`/settin
 - **Section 1** (Dashboard) — only needs Anki running
 - **Section 2** (Quick Add) — only needs Anki running
 - **Section 3** (Browse) — only needs Anki running
-- **Section 5** (Upload) — needs AI backend for extraction (SDK only — vision not supported in CLI)
+- **Section 5** (Upload) — needs AI backend for extraction (SDK or CLI)
 - **Section 7** (Settings) — no external services needed at all
 - **Section 9a** (Telegram settings) — no external services needed
 - **Section 9b-9f** (Telegram bot) — needs real bot token from @BotFather
