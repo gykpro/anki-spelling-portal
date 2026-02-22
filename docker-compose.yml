@@ -21,7 +21,7 @@ services:
     environment:
       ANKI_CONNECT_URL: http://anki:8765
     volumes:
-      - portal-data:/app/data
+      - ./data:/app/data
     ports:
       - "3000:3000"
     depends_on:
@@ -30,4 +30,3 @@ services:
 
 volumes:
   anki-data:
-  portal-data:

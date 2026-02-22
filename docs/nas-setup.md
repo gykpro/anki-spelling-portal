@@ -58,7 +58,7 @@ Set **Backend Mode** to "Auto" (default) to use SDK if available, else fall back
 - **Telegram Bot Token** — for Telegram bot (see [telegram-setup.md](telegram-setup.md))
 - **Telegram Allowed Users** — comma-separated user IDs (optional)
 
-Keys are stored in the `portal-data` Docker volume and persist across restarts.
+Keys are stored in `./data/secrets.json` (bind-mounted from the host) and persist across container restarts and updates.
 
 ### 3. Initial AnkiWeb sync (first run)
 
