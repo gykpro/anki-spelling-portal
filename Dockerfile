@@ -11,13 +11,9 @@ FROM node:20-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
-# Install curl for Claude CLI installer
-RUN apt-get update && apt-get install -y --no-install-recommends curl \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install Claude Code CLI globally
-RUN curl -fsSL https://claude.ai/install.sh | bash \
-    && ln -s /root/.local/bin/claude /usr/local/bin/claude
+# Install Claude Code CLI globally via npm (puts binary in /usr/local/bin/claude)
+RUN npm install -g @anthropic-ai/claude-code \
+    && claude --version || true
 ENV DISABLE_AUTOUPDATER=1
 
 # Create persistent data directory for settings
