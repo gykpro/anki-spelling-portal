@@ -46,12 +46,13 @@ export function buildSpellingCard(
   termWeek: string,
   topic: string
 ): SpellingCard {
+  const hasSentence = extracted.sentence !== "";
   return {
     id: `card_${Date.now()}_${extracted.number}_${Math.random().toString(36).slice(2, 6)}`,
     word: extracted.word,
     sentence: extracted.sentence,
-    mainSentence: buildMainSentence(extracted.sentence, extracted.word),
-    cloze: buildCloze(extracted.sentence, extracted.word),
+    mainSentence: hasSentence ? buildMainSentence(extracted.sentence, extracted.word) : "",
+    cloze: hasSentence ? buildCloze(extracted.sentence, extracted.word) : "",
     termWeek,
     topic,
     edited: false,

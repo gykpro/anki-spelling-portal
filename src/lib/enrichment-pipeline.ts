@@ -42,6 +42,7 @@ Rules:
 4. The underlined text may be a single word or a multi-word phrase - extract the ENTIRE underlined portion
 5. Return ONLY valid JSON, nothing else
 6. Ignore any dictation section if present — only extract the numbered spelling sentences
+7. If the worksheet contains only a word list without example sentences, set "sentence" to "" for each entry and extract just the words
 `;
 
 // ─── Media file type ───

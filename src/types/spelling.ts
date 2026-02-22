@@ -1,7 +1,7 @@
 export interface ExtractedSentence {
   /** 1-based index from the worksheet */
   number: number;
-  /** Full sentence text */
+  /** Full sentence text (empty string for word-only worksheets) */
   sentence: string;
   /** The underlined word or phrase to be tested */
   word: string;
