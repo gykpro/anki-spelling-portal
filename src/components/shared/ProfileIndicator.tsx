@@ -16,7 +16,10 @@ export function ProfileIndicator() {
 
   useEffect(() => {
     fetch("/api/anki/profiles")
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error("Failed to fetch profiles");
+        return r.json();
+      })
       .then(setData)
       .catch(() => {});
   }, []);
