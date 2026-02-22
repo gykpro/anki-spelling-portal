@@ -11,6 +11,9 @@ FROM node:20-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
+# Install Claude Code CLI for CLI backend mode
+RUN npm install -g @anthropic-ai/claude-code
+
 # Create persistent data directory for settings
 RUN mkdir -p /app/data
 
