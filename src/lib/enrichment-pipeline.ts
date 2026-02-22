@@ -571,23 +571,23 @@ export async function runFullPipelineFromExtraction(
     };
   }
 
-  // 3. Enrich text fields (worksheet already has sentences, so enrich remaining)
+  // 3. Enrich text fields
+  // Include "sentence" for items that have no sentence from extraction
+  const needsSentence = created.some((c) => !c.sentence);
+  const enrichFields: TextEnrichField[] = needsSentence
+    ? ALL_TEXT_FIELDS
+    : ["definition", "phonetic", "synonyms", "extra_info"];
+
   await progress.update(
     `Enriching text fields for ${created.length} words...`
   );
-  const enrichFields: TextEnrichField[] = [
-    "definition",
-    "phonetic",
-    "synonyms",
-    "extra_info",
-  ];
   let enrichResults: BatchEnrichResultItem[];
   try {
     enrichResults = await batchEnrichText(
       created.map((c) => ({
         noteId: c.noteId,
         word: c.word,
-        sentence: c.sentence,
+        sentence: c.sentence || undefined,
       })),
       enrichFields
     );
@@ -601,26 +601,12 @@ export async function runFullPipelineFromExtraction(
   for (const result of enrichResults) {
     if (!result.error) {
       try {
-        // Don't overwrite sentence from worksheet
-        await ankiConnect.updateNoteFields({
-          id: result.noteId,
-          fields: {
-            ...(result.definition ? { Definition: result.definition } : {}),
-            ...(result.phonetic
-              ? { "Phonetic symbol": result.phonetic }
-              : {}),
-            ...(result.synonyms
-              ? {
-                  Synonyms: Array.isArray(result.synonyms)
-                    ? result.synonyms.join(", ")
-                    : String(result.synonyms),
-                }
-              : {}),
-            ...(result.extra_info
-              ? { "Extra information": result.extra_info }
-              : {}),
-          },
-        });
+        await saveTextToAnki(result.noteId, result.word, result);
+        // Update sentence in created array for downstream audio/image generation
+        if (result.sentence) {
+          const c = created.find((x) => x.noteId === result.noteId);
+          if (c && !c.sentence) c.sentence = result.sentence;
+        }
       } catch (err) {
         errors.push(`Save text for "${result.word}": ${err instanceof Error ? err.message : String(err)}`);
       }
