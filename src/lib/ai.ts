@@ -4,7 +4,7 @@ import { runClaude, runClaudeJSON } from "./claude-cli";
 
 export type ImageInput = {
   base64: string;
-  mediaType: "image/png" | "image/jpeg" | "image/gif" | "image/webp";
+  mediaType: "image/png" | "image/jpeg" | "image/gif" | "image/webp" | "application/pdf";
 };
 
 function ensureBackend(): "sdk" | "cli" {
@@ -47,7 +47,7 @@ export async function runAIVision<T = unknown>(
       return runAnthropicVision<T>(prompt, images);
     }
     throw new Error(
-      "Vision extraction requires an Anthropic API key (SDK mode). CLI mode does not support image input. Add an API key in Settings."
+      "Image/PDF extraction requires an Anthropic API key. Add one in Settings (required even in CLI mode)."
     );
   }
   return runAnthropicVision<T>(prompt, images);

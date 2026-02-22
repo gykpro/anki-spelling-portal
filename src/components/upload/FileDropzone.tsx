@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { Upload, Image, X } from "lucide-react";
+import { Upload, Image, FileText, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface FileDropzoneProps {
@@ -67,10 +67,10 @@ export function FileDropzone({
       >
         <Upload className="mb-3 h-10 w-10 text-muted-foreground" />
         <p className="text-sm font-medium">
-          Drop spelling worksheet images here
+          Drop spelling worksheet images or PDFs here
         </p>
         <p className="mt-1 text-xs text-muted-foreground">
-          PNG, JPG, or WEBP — one image per page
+          PNG, JPG, WEBP, or PDF
         </p>
         <label
           className={cn(
@@ -82,7 +82,7 @@ export function FileDropzone({
           <input
             type="file"
             multiple
-            accept="image/*"
+            accept="image/*,.pdf"
             onChange={handleInputChange}
             className="hidden"
             disabled={disabled}
@@ -100,7 +100,11 @@ export function FileDropzone({
               key={`${file.name}-${i}`}
               className="flex items-center gap-2 rounded-md bg-muted px-3 py-2 text-sm"
             >
-              <Image className="h-4 w-4 text-muted-foreground" />
+              {file.type === "application/pdf" ? (
+                <FileText className="h-4 w-4 text-muted-foreground" />
+              ) : (
+                <Image className="h-4 w-4 text-muted-foreground" />
+              )}
               <span className="flex-1 truncate">{file.name}</span>
               <span className="text-xs text-muted-foreground">
                 {(file.size / 1024).toFixed(0)} KB

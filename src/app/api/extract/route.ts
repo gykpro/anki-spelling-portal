@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { runAIVision } from "@/lib/ai";
 import { EXTRACTION_PROMPT } from "@/lib/enrichment-pipeline";
 
-function getMediaType(filename: string): "image/png" | "image/jpeg" | "image/gif" | "image/webp" {
+function getMediaType(filename: string): "image/png" | "image/jpeg" | "image/gif" | "image/webp" | "application/pdf" {
   const ext = filename.split(".").pop()?.toLowerCase();
   switch (ext) {
     case "jpg":
@@ -12,6 +12,8 @@ function getMediaType(filename: string): "image/png" | "image/jpeg" | "image/gif
       return "image/gif";
     case "webp":
       return "image/webp";
+    case "pdf":
+      return "application/pdf";
     default:
       return "image/png";
   }
@@ -31,7 +33,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Convert files to base64 for vision API
-    const images: { base64: string; mediaType: "image/png" | "image/jpeg" | "image/gif" | "image/webp" }[] = [];
+    const images: { base64: string; mediaType: "image/png" | "image/jpeg" | "image/gif" | "image/webp" | "application/pdf" }[] = [];
     for (const file of files) {
       const buffer = Buffer.from(await file.arrayBuffer());
       images.push({

@@ -50,21 +50,32 @@ export async function runAnthropicJSON<T = unknown>(prompt: string): Promise<T> 
  */
 export async function runAnthropicVision<T = unknown>(
   prompt: string,
-  images: { base64: string; mediaType: "image/png" | "image/jpeg" | "image/gif" | "image/webp" }[]
+  images: { base64: string; mediaType: "image/png" | "image/jpeg" | "image/gif" | "image/webp" | "application/pdf" }[]
 ): Promise<T> {
   const client = getClient();
 
   const content: Anthropic.MessageCreateParams["messages"][0]["content"] = [];
 
   for (const img of images) {
-    content.push({
-      type: "image",
-      source: {
-        type: "base64",
-        media_type: img.mediaType,
-        data: img.base64,
-      },
-    });
+    if (img.mediaType === "application/pdf") {
+      content.push({
+        type: "document",
+        source: {
+          type: "base64",
+          media_type: "application/pdf",
+          data: img.base64,
+        },
+      });
+    } else {
+      content.push({
+        type: "image",
+        source: {
+          type: "base64",
+          media_type: img.mediaType,
+          data: img.base64,
+        },
+      });
+    }
   }
 
   content.push({ type: "text", text: prompt });
