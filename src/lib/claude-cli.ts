@@ -20,12 +20,11 @@ export function runClaude(prompt: string, options?: {
       "-p",
       "--output-format", "json",
       "--max-budget-usd", String(maxBudget),
-      "--permission-mode", "bypassPermissions",
       "--no-session-persistence",
     ];
 
-    if (allowedTools) {
-      args.push("--allowed-tools", ...allowedTools);
+    if (allowedTools && allowedTools.length > 0) {
+      args.push("--allowedTools", ...allowedTools);
     }
 
     const spawnEnv: NodeJS.ProcessEnv = { ...process.env, FORCE_COLOR: "0" };
