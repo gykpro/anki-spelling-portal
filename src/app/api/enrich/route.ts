@@ -122,11 +122,19 @@ export async function POST(request: NextRequest) {
     }
 
     // Generate audio via Azure TTS (parallel when both requested)
+    // For Chinese, use pinyin for pronunciation guidance
+    const wordPinyin = lang?.id === "chinese"
+      ? (results.phonetic as string | undefined) || undefined
+      : undefined;
+    const sentPinyin = lang?.id === "chinese"
+      ? (results.sentencePinyin as string | undefined) || undefined
+      : undefined;
+
     const audioPromises: Promise<void>[] = [];
 
     if (needsAudio) {
       audioPromises.push(
-        generateTTS(word, "word", lang)
+        generateTTS(word, "word", lang, wordPinyin)
           .then((tts) => { results.audio = tts; })
           .catch((err) => {
             results.audio_error =
@@ -141,7 +149,7 @@ export async function POST(request: NextRequest) {
         results.sentence_audio_error = "Sentence required for sentence audio";
       } else {
         audioPromises.push(
-          generateTTS(stripHtmlServer(ttsText), "sentence", lang)
+          generateTTS(stripHtmlServer(ttsText), "sentence", lang, sentPinyin)
             .then((tts) => { results.sentence_audio = tts; })
             .catch((err) => {
               results.sentence_audio_error =

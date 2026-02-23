@@ -67,10 +67,81 @@ function escapeXml(text: string): string {
     .replace(/'/g, "&apos;");
 }
 
+// ─── Pinyin tone conversion (tone marks → numbered pinyin for Azure TTS) ───
+
+const TONE_MAP: Record<string, [string, number]> = {
+  // a
+  ā: ["a", 1], á: ["a", 2], ǎ: ["a", 3], à: ["a", 4],
+  // e
+  ē: ["e", 1], é: ["e", 2], ě: ["e", 3], è: ["e", 4],
+  // i
+  ī: ["i", 1], í: ["i", 2], ǐ: ["i", 3], ì: ["i", 4],
+  // o
+  ō: ["o", 1], ó: ["o", 2], ǒ: ["o", 3], ò: ["o", 4],
+  // u
+  ū: ["u", 1], ú: ["u", 2], ǔ: ["u", 3], ù: ["u", 4],
+  // ü
+  ǖ: ["v", 1], ǘ: ["v", 2], ǚ: ["v", 3], ǜ: ["v", 4],
+};
+
+/** Convert tone-marked pinyin syllable to numbered pinyin (e.g. "gǎn" → "gan3") */
+function syllableToNumbered(syllable: string): string {
+  let tone = 5; // neutral tone
+  let result = "";
+  for (const ch of syllable) {
+    const mapped = TONE_MAP[ch];
+    if (mapped) {
+      result += mapped[0];
+      tone = mapped[1];
+    } else if (ch === "ü") {
+      result += "v";
+    } else {
+      result += ch;
+    }
+  }
+  return result + tone;
+}
+
+/** Convert tone-marked pinyin string to numbered (e.g. "gǎn kuài" → "gan3 kuai4") */
+export function pinyinToNumbered(pinyin: string): string {
+  return pinyin
+    .trim()
+    .split(/\s+/)
+    .map(syllableToNumbered)
+    .join(" ");
+}
+
+/** Build SSML with pinyin phoneme for Chinese TTS */
+function buildChineseSsml(
+  text: string,
+  pinyin: string | undefined,
+  voice: string,
+  lang: string,
+  rate: string
+): string {
+  if (pinyin) {
+    const numbered = pinyinToNumbered(pinyin);
+    return `<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='${lang}'>
+  <voice name='${voice}'>
+    <prosody rate='${rate}'>
+      <phoneme alphabet='sapi' ph='${escapeXml(numbered)}'>${escapeXml(text)}</phoneme>
+    </prosody>
+  </voice>
+</speak>`;
+  }
+  // No pinyin — let Azure figure it out
+  return `<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='${lang}'>
+  <voice name='${voice}'>
+    <prosody rate='${rate}'>${escapeXml(text)}</prosody>
+  </voice>
+</speak>`;
+}
+
 export async function generateTTS(
   text: string,
   type: "word" | "sentence",
-  lang?: LanguageConfig
+  lang?: LanguageConfig,
+  pinyin?: string
 ): Promise<{ base64: string; format: string }> {
   const key = getConfig("AZURE_TTS_KEY");
   const region = getConfig("AZURE_TTS_REGION");
@@ -78,11 +149,17 @@ export async function generateTTS(
 
   const language = lang ?? getLanguageById("english");
   const rate = type === "word" ? language.tts.wordRate : language.tts.sentenceRate;
-  const ssml = `<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='${language.tts.lang}'>
+
+  let ssml: string;
+  if (language.id === "chinese") {
+    ssml = buildChineseSsml(text, pinyin, language.tts.voice, language.tts.lang, rate);
+  } else {
+    ssml = `<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='${language.tts.lang}'>
   <voice name='${language.tts.voice}'>
     <prosody rate='${rate}'>${escapeXml(text)}</prosody>
   </voice>
 </speak>`;
+  }
 
   const res = await fetch(
     `https://${region}.tts.speech.microsoft.com/cognitiveservices/v1`,
@@ -388,8 +465,23 @@ export async function generateAndSaveAudio(
 ): Promise<MediaFile[]> {
   const mediaFiles: MediaFile[] = [];
 
+  // For Chinese: fetch pinyin from the note's fields
+  let wordPinyin: string | undefined;
+  let sentencePinyin: string | undefined;
+  if (lang?.id === "chinese") {
+    try {
+      const notesInfo = await ankiConnect.notesInfo([noteId]);
+      if (notesInfo.length > 0) {
+        wordPinyin = notesInfo[0].fields?.["Phonetic symbol"]?.value || undefined;
+        sentencePinyin = notesInfo[0].fields?.["Main Sentence Pinyin"]?.value || undefined;
+      }
+    } catch {
+      // Continue without pinyin
+    }
+  }
+
   // Word audio
-  const wordTts = await generateTTS(word, "word", lang);
+  const wordTts = await generateTTS(word, "word", lang, wordPinyin);
   const safeWord = word.replace(/[^a-zA-Z0-9\u4e00-\u9fff]/g, "_");
   const wordFilename = `spelling_${safeWord}_${noteId}.mp3`;
   await ankiConnect.storeMediaFile(wordFilename, wordTts.base64);
@@ -402,7 +494,7 @@ export async function generateAndSaveAudio(
   // Sentence audio (if sentence available)
   if (sentence) {
     const plainSentence = stripHtml(sentence);
-    const sentenceTts = await generateTTS(plainSentence, "sentence", lang);
+    const sentenceTts = await generateTTS(plainSentence, "sentence", lang, sentencePinyin);
     const sentenceFilename = `spelling_sentence_${safeWord}_${noteId}.mp3`;
     await ankiConnect.storeMediaFile(sentenceFilename, sentenceTts.base64);
     await ankiConnect.updateNoteFields({
