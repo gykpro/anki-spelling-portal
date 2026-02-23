@@ -14,6 +14,7 @@ export type EnrichField =
   | "phonetic"
   | "synonyms"
   | "extra_info"
+  | "sentencePinyin"
   | "image"
   | "audio"
   | "sentence_audio";
@@ -32,9 +33,9 @@ function buildPrompt(word: string, sentence: string | undefined, fields: EnrichF
     parts.push(`Context sentence: "${sentence}"`);
   }
 
+  const nonTextFieldSet = new Set(["image", "audio", "sentence_audio"]);
   const textFields = fields.filter(
-    (f): f is TextEnrichField =>
-      !["image", "audio", "sentence_audio"].includes(f)
+    (f): f is TextEnrichField => !nonTextFieldSet.has(f)
   );
   const requested = getFieldDescriptions(textFields);
 

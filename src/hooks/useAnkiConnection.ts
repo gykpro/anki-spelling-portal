@@ -9,6 +9,7 @@ interface HealthStatus {
     ankiVersion: number | null;
     deck: string | null;
     modelExists: boolean;
+    languages?: Record<string, { deck: boolean; model: boolean }>;
   };
 }
 

@@ -416,9 +416,7 @@ function EnrichContent() {
           ids.map((id) => `nid:${id}`).join(" OR ")
         )}&limit=100`;
       } else {
-        url = `/api/anki/notes?q=${encodeURIComponent(
-          'deck:"Gao English Spelling"'
-        )}&limit=100`;
+        url = `/api/anki/notes?limit=100`;
       }
       const res = await fetch(url);
       const data = await res.json();

@@ -133,15 +133,27 @@ export default function DashboardPage() {
               />
             </div>
             <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">Note Type</p>
-              <StatusBadge
-                status={status.checks.modelExists ? "connected" : "disconnected"}
-                label={
-                  status.checks.modelExists
-                    ? "school spelling"
-                    : "Missing"
-                }
-              />
+              <p className="text-xs text-muted-foreground">Note Types</p>
+              {status.checks.languages ? (
+                <div className="flex flex-wrap gap-1.5">
+                  {Object.entries(status.checks.languages as Record<string, { deck: boolean; model: boolean }>).map(([id, lang]) => (
+                    <StatusBadge
+                      key={id}
+                      status={lang.model ? "connected" : "disconnected"}
+                      label={id === "english" ? "EN" : "CN"}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <StatusBadge
+                  status={status.checks.modelExists ? "connected" : "disconnected"}
+                  label={
+                    status.checks.modelExists
+                      ? "school spelling"
+                      : "Missing"
+                  }
+                />
+              )}
             </div>
           </div>
         ) : null}

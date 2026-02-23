@@ -1,8 +1,10 @@
 import type { ExtractedSentence, SpellingCard } from "@/types/spelling";
-import type { SpellingNoteFields, CreateNoteParams } from "@/types/anki";
-
-const DECK_NAME = "Gao English Spelling";
-const MODEL_NAME = "school spelling";
+import type { CreateNoteParams } from "@/types/anki";
+import {
+  type LanguageConfig,
+  detectLanguage,
+  getLanguageById,
+} from "@/lib/languages";
 
 /**
  * Build the Main Sentence field: sentence with the word wrapped in
@@ -60,13 +62,13 @@ export function buildSpellingCard(
 }
 
 /**
- * Convert a reviewed SpellingCard into Anki note creation params.
+ * Build the base fields shared by both English and Chinese note types.
  */
-export function cardToAnkiNote(card: SpellingCard): CreateNoteParams {
-  const noteId = generateNoteId();
-  const tag = card.termWeek.toLowerCase().replace(/\s+/g, "_");
-
-  const fields: Partial<SpellingNoteFields> = {
+function buildBaseFields(
+  card: SpellingCard,
+  noteId: string
+): Record<string, string> {
+  return {
     Word: card.word,
     "Main Sentence": card.mainSentence,
     Cloze: card.cloze,
@@ -78,12 +80,35 @@ export function cardToAnkiNote(card: SpellingCard): CreateNoteParams {
     "Extra information": "",
     Picture: "",
     Synonyms: "",
-    is_dictation_mem: "",
   };
+}
+
+/**
+ * Convert a reviewed SpellingCard into Anki note creation params.
+ * Language is auto-detected from the word if not provided.
+ */
+export function cardToAnkiNote(
+  card: SpellingCard,
+  lang?: LanguageConfig
+): CreateNoteParams {
+  const noteId = generateNoteId();
+  const tag = card.termWeek.toLowerCase().replace(/\s+/g, "_");
+  const language = lang ?? detectLanguage(card.word);
+
+  const fields = buildBaseFields(card, noteId);
+
+  if (language.id === "chinese") {
+    fields["Main Sentence Pinyin"] = "";
+    fields["Stroke Order Anim"] = "";
+    fields["is_dictation"] = "";
+    fields["is_dictation_from_mem"] = "";
+  } else {
+    fields["is_dictation_mem"] = "";
+  }
 
   return {
-    deckName: DECK_NAME,
-    modelName: MODEL_NAME,
+    deckName: language.deck,
+    modelName: language.noteType,
     fields,
     tags: [tag, card.topic.toLowerCase().replace(/\s+/g, "_")],
   };

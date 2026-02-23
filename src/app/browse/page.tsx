@@ -31,12 +31,14 @@ export default function BrowsePage() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
 
+  const [selectedDeck, setSelectedDeck] = useState("Gao English Spelling");
+
   const fetchNotes = useCallback(async (query?: string) => {
     setLoading(true);
     try {
       const q = query
-        ? `deck:"Gao English Spelling" ${query}`
-        : 'deck:"Gao English Spelling"';
+        ? `deck:"${selectedDeck}" ${query}`
+        : `deck:"${selectedDeck}"`;
       const res = await fetch(
         `/api/anki/notes?q=${encodeURIComponent(q)}&limit=500`
       );

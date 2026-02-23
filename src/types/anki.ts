@@ -1,4 +1,4 @@
-/** Fields for the "school spelling" note type */
+/** Fields for the "school spelling" (English) note type */
 export interface SpellingNoteFields {
   Word: string;
   "Main Sentence": string;
@@ -12,6 +12,25 @@ export interface SpellingNoteFields {
   Synonyms: string;
   "Note ID": string;
   is_dictation_mem: string;
+}
+
+/** Fields for the "school Chinese spelling" note type */
+export interface ChineseSpellingNoteFields {
+  Word: string;
+  "Main Sentence": string;
+  Cloze: string;
+  "Phonetic symbol": string;
+  Audio: string;
+  "Main Sentence Audio": string;
+  Definition: string;
+  "Extra information": string;
+  Picture: string;
+  Synonyms: string;
+  "Note ID": string;
+  "Main Sentence Pinyin": string;
+  "Stroke Order Anim": string;
+  is_dictation: string;
+  is_dictation_from_mem: string;
 }
 
 export interface AnkiNote {
@@ -37,13 +56,13 @@ export interface AnkiConnectResponse<T = unknown> {
 export interface CreateNoteParams {
   deckName: string;
   modelName: string;
-  fields: Partial<SpellingNoteFields>;
+  fields: Record<string, string>;
   tags: string[];
 }
 
 export interface UpdateNoteParams {
   id: number;
-  fields: Partial<SpellingNoteFields>;
+  fields: Record<string, string>;
 }
 
 export interface DistributeResult {

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ankiConnect } from "@/lib/anki-connect";
-import type { SpellingNoteFields } from "@/types/anki";
 
 /** PUT: Update fields of an existing note */
 export async function PUT(
@@ -18,7 +17,7 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const fields: Partial<SpellingNoteFields> = body.fields;
+    const fields: Record<string, string> = body.fields;
 
     if (!fields || Object.keys(fields).length === 0) {
       return NextResponse.json(

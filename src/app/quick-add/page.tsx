@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useMemo } from "react";
 import {
   CheckCircle,
   AlertCircle,
@@ -14,6 +14,42 @@ import { DistributionTargets, DistributionStatus } from "@/components/shared/Dis
 import type { DistributeResult } from "@/types/anki";
 
 type Phase = "input" | "checking" | "duplicates" | "submitting" | "done";
+
+/** Detect language from text: Chinese characters → Chinese, otherwise English */
+function detectLang(text: string): { id: "english" | "chinese"; deck: string; noteType: string } {
+  if (/[\u4e00-\u9fff]/.test(text)) {
+    return { id: "chinese", deck: "Gao Chinese", noteType: "school Chinese spelling" };
+  }
+  return { id: "english", deck: "Gao English Spelling", noteType: "school spelling" };
+}
+
+/** Build fields for a quick-add note based on language */
+function buildQuickAddFields(word: string, lang: ReturnType<typeof detectLang>): Record<string, string> {
+  const base: Record<string, string> = {
+    Word: word,
+    "Main Sentence": "",
+    Cloze: "",
+    "Phonetic symbol": "",
+    Audio: "",
+    "Main Sentence Audio": "",
+    Definition: "",
+    "Extra information": "",
+    Picture: "",
+    Synonyms: "",
+    "Note ID": crypto.randomUUID(),
+  };
+
+  if (lang.id === "chinese") {
+    base["Main Sentence Pinyin"] = "";
+    base["Stroke Order Anim"] = "";
+    base["is_dictation"] = "";
+    base["is_dictation_from_mem"] = "";
+  } else {
+    base["is_dictation_mem"] = "";
+  }
+
+  return base;
+}
 
 export default function QuickAddPage() {
   const [wordsInput, setWordsInput] = useState("");
@@ -39,6 +75,12 @@ export default function QuickAddPage() {
 
   const wordsToAdd = words.filter((w) => !skippedWords.has(w.toLowerCase()));
 
+  // Auto-detect language from the first word with content
+  const detectedLang = useMemo(() => {
+    const firstWord = words[0] || "";
+    return detectLang(firstWord);
+  }, [words[0] || ""]);
+
   const checkAndSubmit = useCallback(async () => {
     if (words.length === 0) return;
     setPhase("checking");
@@ -48,7 +90,7 @@ export default function QuickAddPage() {
 
     try {
       const res = await fetch(
-        `/api/anki/notes?checkDuplicates=${encodeURIComponent(words.join(","))}`
+        `/api/anki/notes?deck=${encodeURIComponent(detectedLang.deck)}&checkDuplicates=${encodeURIComponent(words.join(","))}`
       );
       if (!res.ok) throw new Error("Duplicate check failed");
       const data = await res.json();
@@ -66,7 +108,7 @@ export default function QuickAddPage() {
       // If duplicate check fails, submit anyway (non-blocking)
       await submitWords(words);
     }
-  }, [words]);
+  }, [words, detectedLang]);
 
   const submitWords = useCallback(async (wordsToSubmit: string[]) => {
     if (wordsToSubmit.length === 0) {
@@ -77,24 +119,14 @@ export default function QuickAddPage() {
     setPhase("submitting");
     setError(null);
 
+    // Re-detect language from words being submitted
+    const lang = detectLang(wordsToSubmit[0] || "");
+
     try {
       const notes = wordsToSubmit.map((word) => ({
-        deckName: "Gao English Spelling",
-        modelName: "school spelling",
-        fields: {
-          Word: word,
-          "Main Sentence": "",
-          Cloze: "",
-          "Phonetic symbol": "",
-          Audio: "",
-          "Main Sentence Audio": "",
-          Definition: "",
-          "Extra information": "",
-          Picture: "",
-          Synonyms: "",
-          "Note ID": crypto.randomUUID(),
-          is_dictation_mem: "",
-        },
+        deckName: lang.deck,
+        modelName: lang.noteType,
+        fields: buildQuickAddFields(word, lang),
         tags: ["quick_add"],
       }));
 
@@ -291,7 +323,7 @@ export default function QuickAddPage() {
           <div>
             <label className="text-sm font-medium">Words or phrases</label>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              One per line, or comma-separated
+              One per line, or comma-separated. Language is auto-detected.
             </p>
             <textarea
               value={wordsInput}
@@ -302,6 +334,12 @@ export default function QuickAddPage() {
               disabled={phase === "checking" || phase === "submitting"}
             />
           </div>
+
+          {words.length > 0 && (
+            <div className="mb-2 text-xs text-muted-foreground">
+              Detected: <span className="font-medium text-foreground">{detectedLang.id === "chinese" ? "Chinese" : "English"}</span> — deck: {detectedLang.deck}
+            </div>
+          )}
 
           <DistributionTargets
             selected={distTargets}

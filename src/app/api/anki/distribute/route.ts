@@ -2,9 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { ankiConnect, withProfileLock } from "@/lib/anki-connect";
 import { getConfig } from "@/lib/settings";
 import type { DistributeResult } from "@/types/anki";
-
-const DECK_NAME = "Gao English Spelling";
-const MODEL_NAME = "school spelling";
+import { getLanguageByNoteType } from "@/lib/languages";
 
 /** POST: Distribute notes from current profile to target profiles */
 export async function POST(request: NextRequest) {
@@ -37,6 +35,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Detect language from first note's model name
+    const firstNote = sourceNotes[0];
+    const lang = getLanguageByNoteType(firstNote.modelName);
+    const deckName = lang?.deck ?? firstNote.modelName;
+    const modelName = lang?.noteType ?? firstNote.modelName;
+
     const homeProfile = getConfig("ACTIVE_PROFILE");
     if (!homeProfile) {
       return NextResponse.json(
@@ -57,24 +61,24 @@ export async function POST(request: NextRequest) {
 
           // Verify deck exists
           const decks = await ankiConnect.deckNames();
-          if (!decks.includes(DECK_NAME)) {
+          if (!decks.includes(deckName)) {
             await ankiConnect.loadProfileAndWait(homeProfile);
             return {
               profile: targetProfile,
               success: false,
-              error: `Deck "${DECK_NAME}" not found in profile "${targetProfile}"`,
+              error: `Deck "${deckName}" not found in profile "${targetProfile}"`,
               notesDistributed: 0,
             };
           }
 
           // Verify note type exists
           const models = await ankiConnect.modelNames();
-          if (!models.includes(MODEL_NAME)) {
+          if (!models.includes(modelName)) {
             await ankiConnect.loadProfileAndWait(homeProfile);
             return {
               profile: targetProfile,
               success: false,
-              error: `Note type "${MODEL_NAME}" not found in profile "${targetProfile}"`,
+              error: `Note type "${modelName}" not found in profile "${targetProfile}"`,
               notesDistributed: 0,
             };
           }
@@ -104,7 +108,7 @@ export async function POST(request: NextRequest) {
 
             // Search for existing note by UUID text
             const existing = await ankiConnect.findNotes(
-              `deck:"${DECK_NAME}" "${uuid}"`
+              `deck:"${deckName}" "${uuid}"`
             );
 
             if (existing.length > 0) {
@@ -117,8 +121,8 @@ export async function POST(request: NextRequest) {
               // Create new note
               try {
                 await ankiConnect.addNote({
-                  deckName: DECK_NAME,
-                  modelName: MODEL_NAME,
+                  deckName,
+                  modelName,
                   fields,
                   tags: note.tags,
                 });

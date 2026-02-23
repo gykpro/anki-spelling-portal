@@ -18,6 +18,12 @@ import {
 } from "@/lib/card-builder";
 import type { ExtractedPage, SpellingCard } from "@/types/spelling";
 import type { BatchEnrichResultItem } from "@/types/enrichment";
+import {
+  type LanguageConfig,
+  detectLanguage,
+  getLanguageById,
+  getLanguageByNoteType,
+} from "@/lib/languages";
 
 // ─── Extraction prompt (shared with extract route) ───
 
@@ -62,15 +68,17 @@ function escapeXml(text: string): string {
 
 export async function generateTTS(
   text: string,
-  type: "word" | "sentence"
+  type: "word" | "sentence",
+  lang?: LanguageConfig
 ): Promise<{ base64: string; format: string }> {
   const key = getConfig("AZURE_TTS_KEY");
   const region = getConfig("AZURE_TTS_REGION");
   if (!key || !region) throw new Error("Azure TTS credentials not configured");
 
-  const rate = type === "word" ? "-10%" : "0%";
-  const ssml = `<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='en-US'>
-  <voice name='en-US-AnaNeural'>
+  const language = lang ?? getLanguageById("english");
+  const rate = type === "word" ? language.tts.wordRate : language.tts.sentenceRate;
+  const ssml = `<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='${language.tts.lang}'>
+  <voice name='${language.tts.voice}'>
     <prosody rate='${rate}'>${escapeXml(text)}</prosody>
   </voice>
 </speak>`;
@@ -182,9 +190,10 @@ export function extractJsonArray(text: string): Record<string, unknown>[] {
 
 export function buildBatchPrompt(
   cards: { word: string; sentence?: string }[],
-  fields: TextEnrichField[]
+  fields: TextEnrichField[],
+  lang?: LanguageConfig
 ): string {
-  const fieldDescs = getFieldDescriptions(fields);
+  const fieldDescs = getFieldDescriptions(fields, lang?.id);
 
   const wordList = cards
     .map((c, i) => {
@@ -222,16 +231,33 @@ const ALL_TEXT_FIELDS: TextEnrichField[] = [
   "extra_info",
 ];
 
+const ALL_CHINESE_TEXT_FIELDS: TextEnrichField[] = [
+  "sentence",
+  "definition",
+  "phonetic",
+  "synonyms",
+  "extra_info",
+  "sentencePinyin",
+];
+
+function getTextFieldsForLanguage(lang: LanguageConfig): TextEnrichField[] {
+  return lang.id === "chinese" ? ALL_CHINESE_TEXT_FIELDS : ALL_TEXT_FIELDS;
+}
+
 function stripHtml(html: string): string {
   return html.replace(/<[^>]*>/g, "");
 }
 
 /** Check which words already exist in Anki, returns set of existing words (lowercased) */
-export async function checkDuplicates(words: string[]): Promise<Set<string>> {
+export async function checkDuplicates(
+  words: string[],
+  lang?: LanguageConfig
+): Promise<Set<string>> {
+  const deck = lang?.deck ?? getLanguageById("english").deck;
   const existing = new Set<string>();
   for (const word of words) {
     const noteIds = await ankiConnect.findNotes(
-      `deck:"Gao English Spelling" Word:"${word}"`
+      `deck:"${deck}" Word:"${word}"`
     );
     if (noteIds.length > 0) {
       existing.add(word.toLowerCase());
@@ -242,7 +268,8 @@ export async function checkDuplicates(words: string[]): Promise<Set<string>> {
 
 /** Create notes in Anki for given words. Returns array of created note IDs. */
 export async function createWordNotes(
-  words: string[]
+  words: string[],
+  lang?: LanguageConfig
 ): Promise<{ noteId: number; word: string }[]> {
   const cards: SpellingCard[] = words.map((word) => ({
     id: `tg_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
@@ -255,7 +282,7 @@ export async function createWordNotes(
     edited: false,
   }));
 
-  const noteParams = cards.map((c) => cardToAnkiNote(c));
+  const noteParams = cards.map((c) => cardToAnkiNote(c, lang));
   const noteIds = await ankiConnect.addNotes(noteParams);
 
   const created: { noteId: number; word: string }[] = [];
@@ -270,9 +297,12 @@ export async function createWordNotes(
 /** Batch enrich text fields for given notes via AI */
 export async function batchEnrichText(
   cards: { noteId: number; word: string; sentence?: string }[],
-  fields: TextEnrichField[] = ALL_TEXT_FIELDS
+  fields?: TextEnrichField[],
+  lang?: LanguageConfig
 ): Promise<BatchEnrichResultItem[]> {
-  const prompt = buildBatchPrompt(cards, fields);
+  const language = lang ?? getLanguageById("english");
+  const enrichFields = fields ?? getTextFieldsForLanguage(language);
+  const prompt = buildBatchPrompt(cards, enrichFields, language);
   const rawText = await runAI(prompt);
   const parsed = extractJsonArray(rawText);
 
@@ -295,6 +325,7 @@ export async function batchEnrichText(
         phonetic: result.phonetic as string | undefined,
         synonyms: result.synonyms as string[] | undefined,
         extra_info: result.extra_info as string | undefined,
+        sentencePinyin: result.sentencePinyin as string | undefined,
       });
     } else {
       results.push({
@@ -311,7 +342,8 @@ export async function batchEnrichText(
 export async function saveTextToAnki(
   noteId: number,
   word: string,
-  enrichResult: BatchEnrichResultItem
+  enrichResult: BatchEnrichResultItem,
+  lang?: LanguageConfig
 ): Promise<void> {
   const fields: Record<string, string> = {};
 
@@ -336,6 +368,10 @@ export async function saveTextToAnki(
   if (enrichResult.extra_info) {
     fields["Extra information"] = enrichResult.extra_info;
   }
+  // Chinese-specific: sentence pinyin
+  if (lang?.id === "chinese" && enrichResult.sentencePinyin) {
+    fields["Main Sentence Pinyin"] = enrichResult.sentencePinyin;
+  }
 
   if (Object.keys(fields).length > 0) {
     await ankiConnect.updateNoteFields({ id: noteId, fields });
@@ -346,13 +382,15 @@ export async function saveTextToAnki(
 export async function generateAndSaveAudio(
   noteId: number,
   word: string,
-  sentence?: string
+  sentence?: string,
+  lang?: LanguageConfig
 ): Promise<MediaFile[]> {
   const mediaFiles: MediaFile[] = [];
 
   // Word audio
-  const wordTts = await generateTTS(word, "word");
-  const wordFilename = `spelling_${word.replace(/[^a-zA-Z0-9]/g, "_")}_${noteId}.mp3`;
+  const wordTts = await generateTTS(word, "word", lang);
+  const safeWord = word.replace(/[^a-zA-Z0-9\u4e00-\u9fff]/g, "_");
+  const wordFilename = `spelling_${safeWord}_${noteId}.mp3`;
   await ankiConnect.storeMediaFile(wordFilename, wordTts.base64);
   await ankiConnect.updateNoteFields({
     id: noteId,
@@ -363,8 +401,8 @@ export async function generateAndSaveAudio(
   // Sentence audio (if sentence available)
   if (sentence) {
     const plainSentence = stripHtml(sentence);
-    const sentenceTts = await generateTTS(plainSentence, "sentence");
-    const sentenceFilename = `spelling_sentence_${word.replace(/[^a-zA-Z0-9]/g, "_")}_${noteId}.mp3`;
+    const sentenceTts = await generateTTS(plainSentence, "sentence", lang);
+    const sentenceFilename = `spelling_sentence_${safeWord}_${noteId}.mp3`;
     await ankiConnect.storeMediaFile(sentenceFilename, sentenceTts.base64);
     await ankiConnect.updateNoteFields({
       id: noteId,
@@ -384,7 +422,8 @@ export async function generateAndSaveImage(
 ): Promise<MediaFile[]> {
   const imgResult = await generateImage(word, stripHtml(sentence));
   const ext = imgResult.mimeType.includes("png") ? "png" : "jpg";
-  const filename = `spelling_img_${word.replace(/[^a-zA-Z0-9]/g, "_")}_${noteId}.${ext}`;
+  const safeWord = word.replace(/[^a-zA-Z0-9\u4e00-\u9fff]/g, "_");
+  const filename = `spelling_img_${safeWord}_${noteId}.${ext}`;
   await ankiConnect.storeMediaFile(filename, imgResult.base64);
   await ankiConnect.updateNoteFields({
     id: noteId,
@@ -396,13 +435,15 @@ export async function generateAndSaveImage(
 /** Run the full enrichment pipeline for a list of words */
 export async function runFullPipeline(
   words: string[],
-  progress: PipelineProgress
+  progress: PipelineProgress,
+  lang?: LanguageConfig
 ): Promise<{ created: number; duplicates: number; errors: string[] }> {
+  const language = lang ?? detectLanguage(words[0] || "");
   const errors: string[] = [];
 
   // 1. Check duplicates
   await progress.update(`Checking duplicates for ${words.length} words...`);
-  const dupes = await checkDuplicates(words);
+  const dupes = await checkDuplicates(words, language);
   const newWords = words.filter((w) => !dupes.has(w.toLowerCase()));
 
   if (newWords.length === 0) {
@@ -415,7 +456,7 @@ export async function runFullPipeline(
 
   // 2. Sync and create notes
   await ankiConnect.syncBeforeWrite();
-  const created = await createWordNotes(newWords);
+  const created = await createWordNotes(newWords, language);
   if (created.length === 0) {
     return { created: 0, duplicates: dupes.size, errors: ["Failed to create any notes"] };
   }
@@ -426,7 +467,11 @@ export async function runFullPipeline(
   );
   let enrichResults: BatchEnrichResultItem[];
   try {
-    enrichResults = await batchEnrichText(created);
+    enrichResults = await batchEnrichText(
+      created,
+      undefined,
+      language
+    );
   } catch (err) {
     errors.push(`Text enrichment failed: ${err instanceof Error ? err.message : String(err)}`);
     return { created: created.length, duplicates: dupes.size, errors };
@@ -437,7 +482,7 @@ export async function runFullPipeline(
   for (const result of enrichResults) {
     if (!result.error) {
       try {
-        await saveTextToAnki(result.noteId, result.word, result);
+        await saveTextToAnki(result.noteId, result.word, result, language);
       } catch (err) {
         errors.push(`Save text for "${result.word}": ${err instanceof Error ? err.message : String(err)}`);
       }
@@ -456,7 +501,8 @@ export async function runFullPipeline(
       const mediaFiles = await generateAndSaveAudio(
         result.noteId,
         result.word,
-        result.sentence
+        result.sentence,
+        language
       );
       for (const mf of mediaFiles) mediaCache.set(mf.filename, mf.data);
     } catch (err) {
@@ -503,7 +549,8 @@ export async function runFullPipeline(
 /** Run the full pipeline from extracted worksheet pages */
 export async function runFullPipelineFromExtraction(
   pages: ExtractedPage[],
-  progress: PipelineProgress
+  progress: PipelineProgress,
+  lang?: LanguageConfig
 ): Promise<{ created: number; duplicates: number; errors: string[] }> {
   const errors: string[] = [];
 
@@ -521,11 +568,14 @@ export async function runFullPipelineFromExtraction(
     return { created: 0, duplicates: 0, errors: ["No words extracted"] };
   }
 
+  // Auto-detect language from first word if not provided
+  const language = lang ?? detectLanguage(allItems[0].word);
+
   // 1. Check duplicates
   await progress.update(
     `Checking duplicates for ${allItems.length} extracted words...`
   );
-  const dupes = await checkDuplicates(allItems.map((i) => i.word));
+  const dupes = await checkDuplicates(allItems.map((i) => i.word), language);
   const newItems = allItems.filter((i) => !dupes.has(i.word.toLowerCase()));
 
   if (newItems.length === 0) {
@@ -549,7 +599,7 @@ export async function runFullPipelineFromExtraction(
     edited: false,
   }));
 
-  const noteParams = cards.map((c) => cardToAnkiNote(c));
+  const noteParams = cards.map((c) => cardToAnkiNote(c, language));
   const noteIds = await ankiConnect.addNotes(noteParams);
 
   const created: { noteId: number; word: string; sentence: string }[] = [];
@@ -573,10 +623,11 @@ export async function runFullPipelineFromExtraction(
 
   // 3. Enrich text fields
   // Include "sentence" for items that have no sentence from extraction
+  const allTextFields = getTextFieldsForLanguage(language);
   const needsSentence = created.some((c) => !c.sentence);
   const enrichFields: TextEnrichField[] = needsSentence
-    ? ALL_TEXT_FIELDS
-    : ["definition", "phonetic", "synonyms", "extra_info"];
+    ? allTextFields
+    : allTextFields.filter((f) => f !== "sentence");
 
   await progress.update(
     `Enriching text fields for ${created.length} words...`
@@ -589,7 +640,8 @@ export async function runFullPipelineFromExtraction(
         word: c.word,
         sentence: c.sentence || undefined,
       })),
-      enrichFields
+      enrichFields,
+      language
     );
   } catch (err) {
     errors.push(`Text enrichment failed: ${err instanceof Error ? err.message : String(err)}`);
@@ -601,7 +653,7 @@ export async function runFullPipelineFromExtraction(
   for (const result of enrichResults) {
     if (!result.error) {
       try {
-        await saveTextToAnki(result.noteId, result.word, result);
+        await saveTextToAnki(result.noteId, result.word, result, language);
         // Update sentence in created array for downstream audio/image generation
         if (result.sentence) {
           const c = created.find((x) => x.noteId === result.noteId);
@@ -621,7 +673,7 @@ export async function runFullPipelineFromExtraction(
       `Generating audio... ${i + 1}/${created.length}: ${c.word}`
     );
     try {
-      const mediaFiles = await generateAndSaveAudio(c.noteId, c.word, c.sentence);
+      const mediaFiles = await generateAndSaveAudio(c.noteId, c.word, c.sentence, language);
       for (const mf of mediaFiles) mediaCache.set(mf.filename, mf.data);
     } catch (err) {
       errors.push(`Audio for "${c.word}": ${err instanceof Error ? err.message : String(err)}`);
@@ -661,9 +713,6 @@ export async function runFullPipelineFromExtraction(
 
 // ─── Distribution to other profiles ───
 
-const DECK_NAME = "Gao English Spelling";
-const MODEL_NAME = "school spelling";
-
 /** Distribute notes to configured target profiles (server-side) */
 export async function distributeNotes(
   noteIds: number[],
@@ -683,6 +732,12 @@ export async function distributeNotes(
   const sourceNotes = await ankiConnect.notesInfo(noteIds);
   if (sourceNotes.length === 0) return [];
 
+  // Detect language from the first note's model name
+  const firstNote = sourceNotes[0];
+  const lang = getLanguageByNoteType(firstNote.modelName);
+  const deckName = lang?.deck ?? getLanguageById("english").deck;
+  const modelName = lang?.noteType ?? getLanguageById("english").noteType;
+
   const results: DistributeResult[] = [];
 
   for (const targetProfile of targetProfiles) {
@@ -700,25 +755,25 @@ export async function distributeNotes(
         console.log(`[Distribution] Switched to "${targetProfile}" successfully`);
 
         const decks = await ankiConnect.deckNames();
-        if (!decks.includes(DECK_NAME)) {
-          console.log(`[Distribution] Deck "${DECK_NAME}" not found in "${targetProfile}", skipping`);
+        if (!decks.includes(deckName)) {
+          console.log(`[Distribution] Deck "${deckName}" not found in "${targetProfile}", skipping`);
           await ankiConnect.loadProfileAndWait(homeProfile);
           return {
             profile: targetProfile,
             success: false,
-            error: `Deck "${DECK_NAME}" not found`,
+            error: `Deck "${deckName}" not found`,
             notesDistributed: 0,
           };
         }
 
         const models = await ankiConnect.modelNames();
-        if (!models.includes(MODEL_NAME)) {
-          console.log(`[Distribution] Model "${MODEL_NAME}" not found in "${targetProfile}", skipping`);
+        if (!models.includes(modelName)) {
+          console.log(`[Distribution] Model "${modelName}" not found in "${targetProfile}", skipping`);
           await ankiConnect.loadProfileAndWait(homeProfile);
           return {
             profile: targetProfile,
             success: false,
-            error: `Note type "${MODEL_NAME}" not found`,
+            error: `Note type "${modelName}" not found`,
             notesDistributed: 0,
           };
         }
@@ -748,7 +803,7 @@ export async function distributeNotes(
 
           // Search by UUID text within the deck
           const existing = await ankiConnect.findNotes(
-            `deck:"${DECK_NAME}" "${uuid}"`
+            `deck:"${deckName}" "${uuid}"`
           );
 
           if (existing.length > 0) {
@@ -756,8 +811,8 @@ export async function distributeNotes(
           } else {
             try {
               await ankiConnect.addNote({
-                deckName: DECK_NAME,
-                modelName: MODEL_NAME,
+                deckName,
+                modelName,
                 fields,
                 tags: note.tags,
               });

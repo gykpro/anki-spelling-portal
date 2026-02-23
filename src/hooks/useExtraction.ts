@@ -141,7 +141,7 @@ export function useExtraction() {
 
     try {
       const { cardToAnkiNote } = await import("@/lib/card-builder");
-      const notes = state.cards.map(cardToAnkiNote);
+      const notes = state.cards.map((c) => cardToAnkiNote(c));
 
       const res = await fetch("/api/anki/notes", {
         method: "POST",

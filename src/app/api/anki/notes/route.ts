@@ -1,17 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ankiConnect } from "@/lib/anki-connect";
 import type { CreateNoteParams } from "@/types/anki";
+import { getLanguageById } from "@/lib/languages";
 
-/** GET: Search for notes in the spelling deck */
+/** GET: Search for notes in a spelling deck */
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
+    const deck =
+      searchParams.get("deck") || getLanguageById("english").deck;
 
     // Duplicate check mode: return which words already exist in the deck
     const checkDuplicates = searchParams.get("checkDuplicates");
     if (checkDuplicates) {
       const inputWords = checkDuplicates.split(",").map((w) => w.trim()).filter(Boolean);
-      const allNoteIds = await ankiConnect.findNotes('deck:"Gao English Spelling"');
+      const allNoteIds = await ankiConnect.findNotes(`deck:"${deck}"`);
       const existingWords = new Set<string>();
       if (allNoteIds.length > 0) {
         const allNotes = await ankiConnect.notesInfo(allNoteIds);
@@ -25,7 +28,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ duplicates, newWords });
     }
 
-    const query = searchParams.get("q") || 'deck:"Gao English Spelling"';
+    const query = searchParams.get("q") || `deck:"${deck}"`;
     const limit = parseInt(searchParams.get("limit") || "100", 10);
 
     const noteIds = await ankiConnect.findNotes(query);

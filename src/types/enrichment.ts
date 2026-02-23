@@ -45,6 +45,7 @@ export interface BatchEnrichResultItem {
   phonetic?: string;
   synonyms?: string[];
   extra_info?: string;
+  sentencePinyin?: string;
   error?: string;
 }
 
