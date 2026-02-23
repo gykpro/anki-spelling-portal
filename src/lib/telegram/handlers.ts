@@ -72,10 +72,11 @@ export function registerHandlers(bot: Bot): void {
     }
 
     const progress = createProgressReporter(ctx);
-    await progress.update(`Adding ${intent.words.length} word(s)...`);
+    const langLabel = intent.lang.id === "chinese" ? " (Chinese)" : "";
+    await progress.update(`Adding ${intent.words.length} word(s)${langLabel}...`);
 
     try {
-      const result = await runFullPipeline(intent.words, progress);
+      const result = await runFullPipeline(intent.words, progress, intent.lang);
       await progress.send(formatResult(result));
     } catch (err) {
       await ctx.reply(
