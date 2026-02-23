@@ -45,3 +45,10 @@ export const ENRICH_SUFFIX = `Important:
 - Keep language simple and appropriate for a 10-year-old
 - If it's a phrase (like "came down with"), treat it as a unit
 - For definitions of phrases, explain the idiomatic meaning`;
+
+export const CHINESE_ENRICH_SUFFIX = `Important:
+- Keep language simple, appropriate for a Primary 3 student (age 9)
+- All generated text (sentences, definitions, synonyms, extra examples) must be in Chinese
+- If the word is a multi-character compound, treat it as a unit
+- For definitions, explain the meaning in simple Chinese
+- Pinyin must use tone marks (ā á ǎ à), not tone numbers`;

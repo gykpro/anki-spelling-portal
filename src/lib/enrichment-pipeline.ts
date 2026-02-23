@@ -10,6 +10,7 @@ import {
   type TextEnrichField,
   getFieldDescriptions,
   ENRICH_SUFFIX,
+  CHINESE_ENRICH_SUFFIX,
 } from "@/lib/enrich-prompts";
 import {
   buildMainSentence,
@@ -213,7 +214,7 @@ ${wordList}
 
 Return ONLY a JSON array with exactly ${cards.length} objects, one per word in the same order. Each object must include a "word" field matching the input. No markdown, no code fences.
 
-${ENRICH_SUFFIX}`;
+${lang?.id === "chinese" ? CHINESE_ENRICH_SUFFIX : ENRICH_SUFFIX}`;
 }
 
 // ─── Full pipeline functions (for Telegram bot) ───

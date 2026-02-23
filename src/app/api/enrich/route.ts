@@ -5,8 +5,10 @@ import {
   type TextEnrichField,
   getFieldDescriptions,
   ENRICH_SUFFIX,
+  CHINESE_ENRICH_SUFFIX,
 } from "@/lib/enrich-prompts";
 import { generateTTS, generateImage } from "@/lib/enrichment-pipeline";
+import { getLanguageByNoteType, type LanguageConfig } from "@/lib/languages";
 
 export type EnrichField =
   | "sentence"
@@ -17,7 +19,8 @@ export type EnrichField =
   | "sentencePinyin"
   | "image"
   | "audio"
-  | "sentence_audio";
+  | "sentence_audio"
+  | "strokeOrder";
 
 interface EnrichRequest {
   noteId: number;
@@ -26,18 +29,25 @@ interface EnrichRequest {
   fields: EnrichField[];
 }
 
-function buildPrompt(word: string, sentence: string | undefined, fields: EnrichField[]): string {
+function buildPrompt(
+  word: string,
+  sentence: string | undefined,
+  fields: EnrichField[],
+  lang?: LanguageConfig
+): string {
   const parts: string[] = [];
   parts.push(`Word/phrase: "${word}"`);
   if (sentence) {
     parts.push(`Context sentence: "${sentence}"`);
   }
 
-  const nonTextFieldSet = new Set(["image", "audio", "sentence_audio"]);
+  const nonTextFieldSet = new Set(["image", "audio", "sentence_audio", "strokeOrder"]);
   const textFields = fields.filter(
     (f): f is TextEnrichField => !nonTextFieldSet.has(f)
   );
-  const requested = getFieldDescriptions(textFields);
+  const requested = getFieldDescriptions(textFields, lang?.id);
+
+  const suffix = lang?.id === "chinese" ? CHINESE_ENRICH_SUFFIX : ENRICH_SUFFIX;
 
   return `${parts.join("\n")}
 
@@ -46,7 +56,7 @@ Generate the following for this word/phrase. Return ONLY a JSON object, no markd
   ${requested.join(",\n  ")}
 }
 
-${ENRICH_SUFFIX}`;
+${suffix}`;
 }
 
 function stripHtmlServer(html: string): string {
@@ -65,9 +75,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Detect language from noteId's note type
+    let lang: LanguageConfig | undefined;
+    if (noteId) {
+      try {
+        const notesInfo = await ankiConnect.notesInfo([noteId]);
+        if (notesInfo.length > 0) {
+          lang = getLanguageByNoteType(notesInfo[0].modelName);
+        }
+      } catch {
+        // Fall through — use default (English)
+      }
+    }
+
     await ankiConnect.syncBeforeWrite();
 
-    const nonTextFields = new Set(["image", "audio", "sentence_audio"]);
+    const nonTextFields = new Set(["image", "audio", "sentence_audio", "strokeOrder"]);
     const textFields = fields.filter((f) => !nonTextFields.has(f));
     const needsImage = fields.includes("image");
     const needsAudio = fields.includes("audio");
@@ -77,7 +100,7 @@ export async function POST(request: NextRequest) {
 
     // Generate text fields via AI backend
     if (textFields.length > 0) {
-      const prompt = buildPrompt(word, sentence, textFields);
+      const prompt = buildPrompt(word, sentence, textFields as EnrichField[], lang);
       const parsed = await runAIJSON<Record<string, unknown>>(prompt);
       Object.assign(results, parsed);
     }
@@ -103,7 +126,7 @@ export async function POST(request: NextRequest) {
 
     if (needsAudio) {
       audioPromises.push(
-        generateTTS(word, "word")
+        generateTTS(word, "word", lang)
           .then((tts) => { results.audio = tts; })
           .catch((err) => {
             results.audio_error =
@@ -118,7 +141,7 @@ export async function POST(request: NextRequest) {
         results.sentence_audio_error = "Sentence required for sentence audio";
       } else {
         audioPromises.push(
-          generateTTS(stripHtmlServer(ttsText), "sentence")
+          generateTTS(stripHtmlServer(ttsText), "sentence", lang)
             .then((tts) => { results.sentence_audio = tts; })
             .catch((err) => {
               results.sentence_audio_error =
@@ -141,4 +164,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-

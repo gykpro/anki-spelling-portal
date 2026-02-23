@@ -34,7 +34,7 @@ export interface EnrichmentProgress {
 
 export interface BatchEnrichRequest {
   cards: { noteId: number; word: string; sentence?: string }[];
-  fields: ("sentence" | "definition" | "phonetic" | "synonyms" | "extra_info")[];
+  fields: ("sentence" | "definition" | "phonetic" | "synonyms" | "extra_info" | "sentencePinyin")[];
 }
 
 export interface BatchEnrichResultItem {

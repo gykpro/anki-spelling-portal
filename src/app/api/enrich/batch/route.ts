@@ -7,6 +7,7 @@ import type {
   BatchEnrichResultItem,
   BatchEnrichResponse,
 } from "@/types/enrichment";
+import { getLanguageByNoteType, type LanguageConfig } from "@/lib/languages";
 
 const MAX_BATCH_SIZE = 20;
 
@@ -22,6 +23,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Detect language from first card's note type
+    let lang: LanguageConfig | undefined;
+    try {
+      const notesInfo = await ankiConnect.notesInfo([cards[0].noteId]);
+      if (notesInfo.length > 0) {
+        lang = getLanguageByNoteType(notesInfo[0].modelName);
+      }
+    } catch {
+      // Fall through — use default (English)
+    }
+
     await ankiConnect.syncBeforeWrite();
 
     // Process in chunks of MAX_BATCH_SIZE
@@ -29,7 +41,7 @@ export async function POST(request: NextRequest) {
 
     for (let i = 0; i < cards.length; i += MAX_BATCH_SIZE) {
       const chunk = cards.slice(i, i + MAX_BATCH_SIZE);
-      const prompt = buildBatchPrompt(chunk, fields);
+      const prompt = buildBatchPrompt(chunk, fields, lang);
 
       try {
         const rawText = await runAI(prompt);
@@ -51,6 +63,7 @@ export async function POST(request: NextRequest) {
               phonetic: result.phonetic as string | undefined,
               synonyms: result.synonyms as string[] | undefined,
               extra_info: result.extra_info as string | undefined,
+              sentencePinyin: result.sentencePinyin as string | undefined,
             });
           } else {
             allResults.push({
