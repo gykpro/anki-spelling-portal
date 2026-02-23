@@ -18,6 +18,7 @@ import {
   Volume2,
   Zap,
   ImageIcon,
+  PenTool,
 } from "lucide-react";
 import { DistributionTargets, DistributionStatus } from "@/components/shared/DistributionTargets";
 import type { DistributeResult } from "@/types/anki";
@@ -42,54 +43,73 @@ function AudioPreview({ base64, label }: { base64: string; label: string }) {
   );
 }
 
+/** Check if a note is Chinese based on its model name */
+function isChinese(note: AnkiNote): boolean {
+  return note.modelName === "school Chinese spelling";
+}
+
 /** Determine which enrichment fields are available/needed for a note */
 function getEnrichableFields(note: AnkiNote) {
   const word = getFieldValue(note, "Word");
   const sentence = getFieldValue(note, "Main Sentence");
   const hasSentence = !!sentence;
+  const chinese = isChinese(note);
+
+  const fields: Record<EnrichField, { available: boolean; filled: boolean; label: string }> = {
+    sentence: { available: true, filled: hasSentence, label: "Sentence" },
+    definition: {
+      available: true,
+      filled: !!getFieldValue(note, "Definition"),
+      label: "Definition",
+    },
+    phonetic: {
+      available: true,
+      filled: !!getFieldValue(note, "Phonetic symbol"),
+      label: chinese ? "Pinyin" : "Phonetic",
+    },
+    synonyms: {
+      available: true,
+      filled: !!getFieldValue(note, "Synonyms"),
+      label: "Synonyms",
+    },
+    extra_info: {
+      available: true,
+      filled: !!getFieldValue(note, "Extra information"),
+      label: "Extra Examples",
+    },
+    sentencePinyin: {
+      available: chinese,
+      filled: !!getFieldValue(note, "Main Sentence Pinyin"),
+      label: "Sentence Pinyin",
+    },
+    image: {
+      available: hasSentence,
+      filled: !!getFieldValue(note, "Picture"),
+      label: "Image",
+    },
+    audio: {
+      available: true,
+      filled: !!getFieldValue(note, "Audio"),
+      label: "Word Audio",
+    },
+    sentence_audio: {
+      available: hasSentence,
+      filled: !!getFieldValue(note, "Main Sentence Audio"),
+      label: "Sentence Audio",
+    },
+    strokeOrder: {
+      available: chinese,
+      filled: !!getFieldValue(note, "Stroke Order Anim"),
+      label: "Stroke Order",
+    },
+  };
 
   return {
     word,
     sentence: stripHtml(sentence),
     hasSentence,
-    fields: {
-      sentence: { available: true, filled: hasSentence, label: "Sentence" },
-      definition: {
-        available: true,
-        filled: !!getFieldValue(note, "Definition"),
-        label: "Definition",
-      },
-      phonetic: {
-        available: true,
-        filled: !!getFieldValue(note, "Phonetic symbol"),
-        label: "Phonetic",
-      },
-      synonyms: {
-        available: true,
-        filled: !!getFieldValue(note, "Synonyms"),
-        label: "Synonyms",
-      },
-      extra_info: {
-        available: true,
-        filled: !!getFieldValue(note, "Extra information"),
-        label: "Extra Examples",
-      },
-      image: {
-        available: hasSentence,
-        filled: !!getFieldValue(note, "Picture"),
-        label: "Image",
-      },
-      audio: {
-        available: true,
-        filled: !!getFieldValue(note, "Audio"),
-        label: "Word Audio",
-      },
-      sentence_audio: {
-        available: hasSentence,
-        filled: !!getFieldValue(note, "Main Sentence Audio"),
-        label: "Sentence Audio",
-      },
-    } as Record<EnrichField, { available: boolean; filled: boolean; label: string }>,
+    chinese,
+    fields,
   };
 }
 
@@ -322,6 +342,22 @@ function EnrichCard({
                   Sentence Audio: {state.results.sentence_audio_error as string}
                 </p>
               )}
+              {!!state.results.sentencePinyin && (
+                <p>
+                  <span className="text-muted-foreground">Sentence Pinyin:</span>{" "}
+                  {state.results.sentencePinyin as string}
+                </p>
+              )}
+              {!!state.results.strokeOrder && (
+                <p className="text-success">
+                  Stroke order: {(state.results.strokeOrder as { count: number }).count} character(s)
+                </p>
+              )}
+              {!!state.results.strokeOrder_error && (
+                <p className="text-destructive">
+                  Stroke Order: {state.results.strokeOrder_error as string}
+                </p>
+              )}
             </div>
           )}
 
@@ -540,6 +576,9 @@ function EnrichContent() {
       fields["Synonyms"] = syns;
     }
     if (r.extra_info) fields["Extra information"] = r.extra_info as string;
+    if (r.sentencePinyin && isChinese(note)) {
+      fields["Main Sentence Pinyin"] = r.sentencePinyin as string;
+    }
 
     // Handle image: store in Anki media, then set Picture field
     if (r.image && typeof r.image === "object") {
@@ -736,6 +775,7 @@ function EnrichContent() {
             if (item.phonetic) results.phonetic = item.phonetic;
             if (item.synonyms) results.synonyms = item.synonyms;
             if (item.extra_info) results.extra_info = item.extra_info;
+            if (item.sentencePinyin) results.sentencePinyin = item.sentencePinyin;
 
             next[item.noteId] = {
               ...existing,
@@ -946,6 +986,77 @@ function EnrichContent() {
     }
 
     setBatchProgress(`Images done for ${cardsNeedingImages.length} cards`);
+    setBatchEnriching(false);
+  };
+
+  const generateAllStrokeOrder = async () => {
+    const cardsNeedingStroke: { noteId: number; word: string }[] = [];
+
+    for (const note of notes) {
+      const info = getEnrichableFields(note);
+      if (info.fields.strokeOrder.available && !info.fields.strokeOrder.filled) {
+        cardsNeedingStroke.push({ noteId: note.noteId, word: info.word });
+      }
+    }
+
+    if (cardsNeedingStroke.length === 0) return;
+
+    setBatchEnriching(true);
+    setBatchProgress(`Stroke order 0/${cardsNeedingStroke.length}...`);
+
+    setNoteStates((prev) => {
+      const next = { ...prev };
+      for (const c of cardsNeedingStroke) {
+        next[c.noteId] = { ...next[c.noteId], enriching: true, error: null };
+      }
+      return next;
+    });
+
+    for (let i = 0; i < cardsNeedingStroke.length; i++) {
+      const card = cardsNeedingStroke[i];
+      setBatchProgress(`Stroke order ${i + 1}/${cardsNeedingStroke.length}: ${card.word}...`);
+
+      try {
+        const res = await fetch("/api/enrich", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            noteId: card.noteId,
+            word: card.word,
+            fields: ["strokeOrder"],
+          }),
+        });
+
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.error || "Stroke order generation failed");
+        }
+
+        const results = await res.json();
+        setNoteStates((prev) => ({
+          ...prev,
+          [card.noteId]: {
+            ...prev[card.noteId],
+            enriching: false,
+            results: prev[card.noteId].results
+              ? { ...prev[card.noteId].results, ...results }
+              : results,
+            expanded: true,
+          },
+        }));
+      } catch (err) {
+        setNoteStates((prev) => ({
+          ...prev,
+          [card.noteId]: {
+            ...prev[card.noteId],
+            enriching: false,
+            error: err instanceof Error ? err.message : "Stroke order failed",
+          },
+        }));
+      }
+    }
+
+    setBatchProgress(`Stroke order done for ${cardsNeedingStroke.length} cards`);
     setBatchEnriching(false);
   };
 
@@ -1202,6 +1313,12 @@ function EnrichContent() {
     return info.fields.image.available && !info.fields.image.filled;
   }).length;
 
+  // Count Chinese cards with missing stroke order
+  const cardsWithMissingStrokeOrder = notes.filter((note) => {
+    const info = getEnrichableFields(note);
+    return info.fields.strokeOrder.available && !info.fields.strokeOrder.filled;
+  }).length;
+
   // Count unsaved results
   const unsavedCount = notes.filter(
     (n) => noteStates[n.noteId]?.results && !noteStates[n.noteId]?.saved
@@ -1294,6 +1411,23 @@ function EnrichContent() {
             ? "Generating..."
             : `Generate All Images (${cardsWithMissingImages})`}
         </button>
+
+        {cardsWithMissingStrokeOrder > 0 && (
+          <button
+            onClick={generateAllStrokeOrder}
+            disabled={batchEnriching || savingAll || cardsWithMissingStrokeOrder === 0}
+            className="inline-flex items-center gap-1.5 rounded-md bg-primary/80 px-4 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-40"
+          >
+            {batchEnriching ? (
+              <LoadingSpinner size="sm" className="text-primary-foreground" />
+            ) : (
+              <PenTool className="h-3.5 w-3.5" />
+            )}
+            {batchEnriching
+              ? "Generating..."
+              : `Generate All Stroke Order (${cardsWithMissingStrokeOrder})`}
+          </button>
+        )}
 
         {unsavedCount > 0 && (
           <button

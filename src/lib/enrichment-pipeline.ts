@@ -525,6 +525,52 @@ export async function generateAndSaveImage(
   return [{ filename, data: imgResult.base64 }];
 }
 
+/** Generate and save stroke order GIFs for Chinese characters in a word */
+export async function generateAndSaveStrokeOrder(
+  noteId: number,
+  word: string
+): Promise<MediaFile[]> {
+  const mediaFiles: MediaFile[] = [];
+  const imgTags: string[] = [];
+
+  for (const char of word) {
+    // Only process CJK characters
+    if (!/[\u4e00-\u9fff]/.test(char)) continue;
+
+    const charCode = char.codePointAt(0);
+    if (!charCode) continue;
+
+    const url = `https://www.mdbg.net/chinese/rsc/img/stroke_anim/${charCode}.gif`;
+
+    try {
+      const res = await fetch(url);
+      if (!res.ok) {
+        console.warn(`[StrokeOrder] Failed to fetch ${char} (U+${charCode.toString(16)}): ${res.status}`);
+        continue;
+      }
+
+      const arrayBuffer = await res.arrayBuffer();
+      const base64 = Buffer.from(arrayBuffer).toString("base64");
+      const filename = `stroke_${charCode}_${noteId}.gif`;
+
+      await ankiConnect.storeMediaFile(filename, base64);
+      mediaFiles.push({ filename, data: base64 });
+      imgTags.push(`<img src="${filename}">`);
+    } catch (err) {
+      console.warn(`[StrokeOrder] Error fetching ${char}:`, err);
+    }
+  }
+
+  if (imgTags.length > 0) {
+    await ankiConnect.updateNoteFields({
+      id: noteId,
+      fields: { "Stroke Order Anim": imgTags.join(" ") },
+    });
+  }
+
+  return mediaFiles;
+}
+
 /** Run the full enrichment pipeline for a list of words */
 export async function runFullPipeline(
   words: string[],

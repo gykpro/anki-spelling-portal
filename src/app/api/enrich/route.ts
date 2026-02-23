@@ -7,7 +7,7 @@ import {
   ENRICH_SUFFIX,
   CHINESE_ENRICH_SUFFIX,
 } from "@/lib/enrich-prompts";
-import { generateTTS, generateImage } from "@/lib/enrichment-pipeline";
+import { generateTTS, generateImage, generateAndSaveStrokeOrder } from "@/lib/enrichment-pipeline";
 import { getLanguageByNoteType, type LanguageConfig } from "@/lib/languages";
 
 export type EnrichField =
@@ -95,6 +95,7 @@ export async function POST(request: NextRequest) {
     const needsImage = fields.includes("image");
     const needsAudio = fields.includes("audio");
     const needsSentenceAudio = fields.includes("sentence_audio");
+    const needsStrokeOrder = fields.includes("strokeOrder");
 
     const results: Record<string, unknown> = { noteId, word };
 
@@ -118,6 +119,17 @@ export async function POST(request: NextRequest) {
           results.image_error =
             err instanceof Error ? err.message : "Image generation failed";
         }
+      }
+    }
+
+    // Generate stroke order GIFs (Chinese only)
+    if (needsStrokeOrder && noteId) {
+      try {
+        const strokeMedia = await generateAndSaveStrokeOrder(noteId, word);
+        results.strokeOrder = { count: strokeMedia.length };
+      } catch (err) {
+        results.strokeOrder_error =
+          err instanceof Error ? err.message : "Stroke order generation failed";
       }
     }
 
