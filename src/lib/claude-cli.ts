@@ -1,8 +1,12 @@
 import { spawn } from "child_process";
+import { existsSync } from "fs";
 import { writeFile, unlink, mkdtemp, rmdir } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 import { getConfig } from "./settings";
+
+// Resolve claude binary path — use absolute path in Docker where PATH may not include it
+const CLAUDE_BIN = existsSync("/usr/local/bin/claude") ? "/usr/local/bin/claude" : "claude";
 
 /**
  * Invoke the Claude Code CLI with a prompt piped via stdin.
@@ -33,7 +37,7 @@ export function runClaude(prompt: string, options?: {
       spawnEnv["CLAUDE_CODE_OAUTH_TOKEN"] = oauthToken;
     }
 
-    const child = spawn("claude", args, {
+    const child = spawn(CLAUDE_BIN, args, {
       env: spawnEnv,
       stdio: ["pipe", "pipe", "pipe"],
     });
