@@ -17,6 +17,11 @@ const QUICK_FILTERS: { key: QuickFilter; label: string }[] = [
   { key: "has_all", label: "Complete" },
 ];
 
+const DECK_OPTIONS = [
+  { value: "Gao English Spelling", label: "English" },
+  { value: "Gao Chinese", label: "Chinese" },
+];
+
 function getFieldValue(note: AnkiNote, field: string): string {
   return note.fields[field]?.value || "";
 }
@@ -30,7 +35,6 @@ export default function BrowsePage() {
   const [quickFilter, setQuickFilter] = useState<QuickFilter>("all");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
-
   const [selectedDeck, setSelectedDeck] = useState("Gao English Spelling");
 
   const fetchNotes = useCallback(async (query?: string) => {
@@ -69,11 +73,18 @@ export default function BrowsePage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [selectedDeck]);
 
   useEffect(() => {
     fetchNotes();
   }, [fetchNotes]);
+
+  const handleDeckChange = (deck: string) => {
+    setSelectedDeck(deck);
+    setSearch("");
+    setSelectedIds(new Set());
+    setQuickFilter("all");
+  };
 
   // Apply quick filter client-side
   const filteredNotes = useMemo(() => {
@@ -144,12 +155,30 @@ export default function BrowsePage() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h2 className="text-2xl font-bold tracking-tight">Browse Cards</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          View and manage spelling cards in Anki
-          {total > 0 && ` (${total} total)`}
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight">Browse Cards</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            View and manage spelling cards in Anki
+            {total > 0 && ` (${total} total)`}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          {DECK_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              onClick={() => handleDeckChange(opt.value)}
+              className={cn(
+                "rounded-md border px-3 py-1.5 text-sm font-medium transition-colors",
+                selectedDeck === opt.value
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border text-muted-foreground hover:bg-muted"
+              )}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Search bar */}
