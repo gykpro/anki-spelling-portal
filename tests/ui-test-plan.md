@@ -51,7 +51,7 @@ Before running tests, configure all API keys via the **Settings page** (`/settin
 
 ### 1a. Health checks (happy path)
 - Navigate to `/`
-- Verify: AnkiConnect shows green + version, Deck shows "Gao English Spelling", Note Type shows "school spelling+"
+- Verify: AnkiConnect shows green + version, note type badges show EN and CN status
 - Click Refresh, verify status re-renders
 
 ### 1b. Health checks (AnkiConnect down)
@@ -690,6 +690,98 @@ These tests verify the skill scripts work correctly via command line.
     ```
   - Delete found note IDs via deleteNotes
 - Remove distribution targets from Settings
+
+---
+
+## 12. Chinese Spelling Support
+
+### Pre-requisites
+- Anki running with "Gao Chinese" deck and "school Chinese spelling" note type configured
+- All API keys configured (Anthropic/Claude, Azure TTS, Gemini)
+- Dev server running
+
+### 12a. Dashboard — Multi-language health
+- Navigate to `/`
+- Verify System Status shows note type badges for both EN and CN
+- Verify both "school spelling" and "school Chinese spelling" show green when configured
+
+### 12b. Browse — Deck selector
+- Navigate to `/browse`
+- Verify deck toggle buttons appear (English / Chinese)
+- Click "Chinese" — verify cards from "Gao Chinese" deck load
+- Click "English" — verify cards from "Gao English Spelling" deck load
+- Verify search, filters, and pagination work on each deck independently
+- Verify switching decks resets selection and search
+
+### 12c. Quick Add — Chinese auto-detection
+- Navigate to `/quick-add`
+- Enter a Chinese word: `__test_赶快`
+- Verify language indicator shows "Chinese" (auto-detected)
+- Submit — verify card created in "Gao Chinese" deck with "school Chinese spelling" note type
+- Navigate to Browse, switch to Chinese deck, verify `__test_赶快` appears
+- Go back to Quick Add, enter an English word: `__test_regression_english`
+- Verify language indicator shows "English"
+- Submit — verify card created in "Gao English Spelling" deck (regression check)
+
+### 12d. Enrich — Chinese fields shown
+- Navigate to `/enrich` with a Chinese card's noteId
+- Expand the card — verify Chinese-specific fields:
+  - "Pinyin" (not "Phonetic") label
+  - "Sentence Pinyin" field (available for Chinese)
+  - "Stroke Order" field (available for Chinese)
+- Verify Image and Sentence Audio behave same as English
+
+### 12e. Enrich — Chinese text generation
+- Select all empty text fields on a Chinese card (including Sentence Pinyin)
+- Click Generate
+- Verify results include: Chinese definition, pinyin with tone marks, Chinese synonyms, Chinese extra examples, sentence pinyin
+- Verify results are in Chinese (not English translations)
+- Save to Anki, verify fields populated
+
+### 12f. Enrich — Chinese TTS audio
+- On a Chinese card with pinyin filled, select "Word Audio"
+- Click Generate — verify audio generated
+- Play audio — verify Chinese pronunciation (should use zh-CN voice)
+- Select "Sentence Audio" (if sentence exists)
+- Generate and play — verify sentence read in Chinese
+
+### 12g. Enrich — Stroke order generation
+- On a Chinese card, select "Stroke Order"
+- Click Generate — verify stroke order GIFs generated
+- Verify results show "Stroke order: N character(s)"
+- Save to Anki, verify "Stroke Order Anim" field has `<img>` tags
+
+### 12h. Enrich — Batch stroke order
+- On the enrich page with Chinese cards missing stroke order
+- Verify "Generate All Stroke Order (N)" button appears
+- Click it — verify progress shows "Stroke order 1/N: word..."
+- Verify all cards get stroke order GIFs
+
+### 12i. Telegram — Chinese word (manual)
+- Send a Chinese word to the bot: `__test_电脑`
+- Verify bot auto-detects Chinese language
+- Verify card created in "Gao Chinese" deck
+- Verify enrichment uses Chinese prompts (Chinese definition, pinyin)
+
+### 12j. Telegram — Chinese word list (manual)
+- Send multiple Chinese words separated by comma or 、: `__test_学校、__test_老师`
+- Verify both words created in Chinese deck with Chinese enrichment
+
+### 12k. Telegram — English regression (manual)
+- Send an English word: `__test_telegram_english`
+- Verify card created in "Gao English Spelling" (not Chinese deck)
+
+### 12l. Cleanup
+- Delete all `__test_` notes from both decks:
+  ```
+  curl -s http://localhost:8765 -X POST \
+    -d '{"action":"findNotes","version":6,"params":{"query":"deck:\"Gao Chinese\" __test_*"}}'
+  ```
+  ```
+  curl -s http://localhost:8765 -X POST \
+    -d '{"action":"findNotes","version":6,"params":{"query":"deck:\"Gao English Spelling\" __test_*"}}'
+  ```
+- Delete found note IDs via deleteNotes
 
 ---
 

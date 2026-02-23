@@ -15,6 +15,7 @@
 ## Pending
 
 ## Recently Completed
+- [x] **Chinese Spelling Support** — Full Chinese language support: language auto-detection, Chinese note type/deck, Browse deck selector, Chinese enrichment prompts (pinyin, Chinese definitions, Chinese synonyms), Chinese TTS with SSML pinyin pronunciation, stroke order GIF generation from MDBG, Telegram Chinese auto-detection. All 8 phases complete.
 - [x] **PDF Upload Support** — Added PDF support end-to-end: portal upload dropzone, extract API, Anthropic SDK (document blocks), Telegram bot (document handler). Improved vision error message for CLI mode.
 - [x] **Distribute Media Files to All Profiles** — Media files (audio MP3s, images) are now stored in each target profile's `collection.media/` during distribution, fixing broken audio/images in non-home profiles.
 - [x] **CI/CD Docker Image Builds** — GitHub Actions workflow (`.github/workflows/docker.yml`) auto-builds and pushes Docker image to Docker Hub (`gykpro/anki-spelling-portal`) on version tag push. `release.sh` updated to auto-push tags to origin.
