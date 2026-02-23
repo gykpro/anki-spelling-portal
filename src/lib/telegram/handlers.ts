@@ -15,9 +15,13 @@ function formatResult(result: {
   created: number;
   duplicates: number;
   errors: string[];
+  deck?: string;
+  lang?: string;
 }): string {
   const lines: string[] = [];
   lines.push(`<b>Done!</b>`);
+  if (result.lang) lines.push(`Language: ${result.lang}`);
+  if (result.deck) lines.push(`Deck: ${result.deck}`);
   if (result.created > 0) lines.push(`Created: ${result.created} cards`);
   if (result.duplicates > 0) lines.push(`Duplicates skipped: ${result.duplicates}`);
   if (result.errors.length > 0) {
@@ -72,12 +76,17 @@ export function registerHandlers(bot: Bot): void {
     }
 
     const progress = createProgressReporter(ctx);
-    const langLabel = intent.lang.id === "chinese" ? " (Chinese)" : "";
-    await progress.update(`Adding ${intent.words.length} word(s)${langLabel}...`);
+    await progress.update(
+      `Adding ${intent.words.length} word(s) → ${intent.lang.label} (${intent.lang.deck})...`
+    );
 
     try {
       const result = await runFullPipeline(intent.words, progress, intent.lang);
-      await progress.send(formatResult(result));
+      await progress.send(formatResult({
+        ...result,
+        lang: intent.lang.label,
+        deck: intent.lang.deck,
+      }));
     } catch (err) {
       await ctx.reply(
         `Error: ${err instanceof Error ? err.message : String(err)}`

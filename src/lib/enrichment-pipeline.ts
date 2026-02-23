@@ -581,7 +581,7 @@ export async function runFullPipeline(
   const errors: string[] = [];
 
   // 1. Check duplicates
-  await progress.update(`Checking duplicates for ${words.length} words...`);
+  await progress.update(`[${language.label}] Checking duplicates for ${words.length} words...`);
   const dupes = await checkDuplicates(words, language);
   const newWords = words.filter((w) => !dupes.has(w.toLowerCase()));
 
@@ -590,7 +590,7 @@ export async function runFullPipeline(
   }
 
   await progress.update(
-    `${dupes.size} duplicate(s) skipped. Creating ${newWords.length} notes...`
+    `[${language.label}] ${dupes.size} duplicate(s) skipped. Creating ${newWords.length} notes in ${language.deck}...`
   );
 
   // 2. Sync and create notes
@@ -602,7 +602,7 @@ export async function runFullPipeline(
 
   // 3. Enrich text fields
   await progress.update(
-    `Enriching text fields for ${created.length} words...`
+    `[${language.label}] Enriching text for ${created.length} words...`
   );
   let enrichResults: BatchEnrichResultItem[];
   try {
@@ -617,7 +617,7 @@ export async function runFullPipeline(
   }
 
   // 4. Save text to Anki
-  await progress.update("Saving text fields to Anki...");
+  await progress.update(`[${language.label}] Saving text to Anki...`);
   for (const result of enrichResults) {
     if (!result.error) {
       try {
@@ -634,7 +634,7 @@ export async function runFullPipeline(
     const result = enrichResults[i];
     if (result.error) continue;
     await progress.update(
-      `Generating audio... ${i + 1}/${enrichResults.length}: ${result.word}`
+      `[${language.label}] Audio ${i + 1}/${enrichResults.length}: ${result.word}`
     );
     try {
       const mediaFiles = await generateAndSaveAudio(
@@ -654,7 +654,7 @@ export async function runFullPipeline(
     const result = enrichResults[i];
     if (result.error || !result.sentence) continue;
     await progress.update(
-      `Generating images... ${i + 1}/${enrichResults.length}: ${result.word}`
+      `[${language.label}] Image ${i + 1}/${enrichResults.length}: ${result.word}`
     );
     try {
       const mediaFiles = await generateAndSaveImage(
@@ -712,7 +712,7 @@ export async function runFullPipelineFromExtraction(
 
   // 1. Check duplicates
   await progress.update(
-    `Checking duplicates for ${allItems.length} extracted words...`
+    `[${language.label}] Checking duplicates for ${allItems.length} extracted words...`
   );
   const dupes = await checkDuplicates(allItems.map((i) => i.word), language);
   const newItems = allItems.filter((i) => !dupes.has(i.word.toLowerCase()));
@@ -722,7 +722,7 @@ export async function runFullPipelineFromExtraction(
   }
 
   await progress.update(
-    `${dupes.size} duplicate(s) skipped. Creating ${newItems.length} notes...`
+    `[${language.label}] ${dupes.size} duplicate(s) skipped. Creating ${newItems.length} notes in ${language.deck}...`
   );
 
   // 2. Sync and create notes (with proper sentence/cloze from worksheet)
@@ -769,7 +769,7 @@ export async function runFullPipelineFromExtraction(
     : allTextFields.filter((f) => f !== "sentence");
 
   await progress.update(
-    `Enriching text fields for ${created.length} words...`
+    `[${language.label}] Enriching text for ${created.length} words...`
   );
   let enrichResults: BatchEnrichResultItem[];
   try {
@@ -788,7 +788,7 @@ export async function runFullPipelineFromExtraction(
   }
 
   // 4. Save text to Anki
-  await progress.update("Saving text fields to Anki...");
+  await progress.update(`[${language.label}] Saving text to Anki...`);
   for (const result of enrichResults) {
     if (!result.error) {
       try {
@@ -809,7 +809,7 @@ export async function runFullPipelineFromExtraction(
   for (let i = 0; i < created.length; i++) {
     const c = created[i];
     await progress.update(
-      `Generating audio... ${i + 1}/${created.length}: ${c.word}`
+      `[${language.label}] Audio ${i + 1}/${created.length}: ${c.word}`
     );
     try {
       const mediaFiles = await generateAndSaveAudio(c.noteId, c.word, c.sentence, language);
@@ -823,7 +823,7 @@ export async function runFullPipelineFromExtraction(
   for (let i = 0; i < created.length; i++) {
     const c = created[i];
     await progress.update(
-      `Generating images... ${i + 1}/${created.length}: ${c.word}`
+      `[${language.label}] Image ${i + 1}/${created.length}: ${c.word}`
     );
     try {
       const mediaFiles = await generateAndSaveImage(c.noteId, c.word, c.sentence);
