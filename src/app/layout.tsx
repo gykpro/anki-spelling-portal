@@ -1,29 +1,13 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { Suspense } from "react";
 import "./globals.css";
-import {
-  Home,
-  Upload,
-  Library,
-  Sparkles,
-  PenLine,
-  Settings,
-} from "lucide-react";
 import { ProfileIndicator } from "@/components/shared/ProfileIndicator";
+import { SidebarNav } from "@/components/shared/SidebarNav";
 
 export const metadata: Metadata = {
   title: "Anki Spelling Portal",
   description: "Extract, review, and enrich spelling cards for Anki",
 };
-
-const navItems = [
-  { href: "/", label: "Dashboard", icon: Home },
-  { href: "/upload", label: "Upload", icon: Upload },
-  { href: "/quick-add", label: "Quick Add", icon: PenLine },
-  { href: "/browse", label: "Browse", icon: Library },
-  { href: "/enrich", label: "Enrich", icon: Sparkles },
-  { href: "/settings", label: "Settings", icon: Settings },
-];
 
 export default function RootLayout({
   children,
@@ -42,18 +26,9 @@ export default function RootLayout({
               </h1>
               <ProfileIndicator />
             </div>
-            <nav className="flex-1 p-2">
-              {navItems.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className="flex items-center gap-2.5 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                >
-                  <item.icon className="h-4 w-4" />
-                  {item.label}
-                </Link>
-              ))}
-            </nav>
+            <Suspense>
+              <SidebarNav />
+            </Suspense>
           </aside>
 
           {/* Main content */}

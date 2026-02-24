@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { useSearchParams } from "next/navigation";
 import { Search, RefreshCw, Filter } from "lucide-react";
 import { NoteTable } from "@/components/browse/NoteTable";
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
 import { cn } from "@/lib/utils";
+import { getAllLanguages } from "@/lib/languages";
 import type { AnkiNote } from "@/types/anki";
 
 type QuickFilter = "all" | "missing_definition" | "missing_audio" | "missing_image" | "has_all";
@@ -17,16 +19,16 @@ const QUICK_FILTERS: { key: QuickFilter; label: string }[] = [
   { key: "has_all", label: "Complete" },
 ];
 
-const DECK_OPTIONS = [
-  { value: "Gao English Spelling", label: "English" },
-  { value: "Gao Chinese", label: "Chinese" },
-];
+const DEFAULT_DECK = getAllLanguages()[0].deck;
 
 function getFieldValue(note: AnkiNote, field: string): string {
   return note.fields[field]?.value || "";
 }
 
 export default function BrowsePage() {
+  const searchParams = useSearchParams();
+  const selectedDeck = searchParams.get("deck") || DEFAULT_DECK;
+
   const [allNotes, setAllNotes] = useState<AnkiNote[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -35,7 +37,6 @@ export default function BrowsePage() {
   const [quickFilter, setQuickFilter] = useState<QuickFilter>("all");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
-  const [selectedDeck, setSelectedDeck] = useState("Gao English Spelling");
 
   const fetchNotes = useCallback(async (query?: string) => {
     setLoading(true);
@@ -79,12 +80,12 @@ export default function BrowsePage() {
     fetchNotes();
   }, [fetchNotes]);
 
-  const handleDeckChange = (deck: string) => {
-    setSelectedDeck(deck);
+  // Reset state when deck changes via URL
+  useEffect(() => {
     setSearch("");
     setSelectedIds(new Set());
     setQuickFilter("all");
-  };
+  }, [selectedDeck]);
 
   // Apply quick filter client-side
   const filteredNotes = useMemo(() => {
@@ -155,30 +156,12 @@ export default function BrowsePage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">Browse Cards</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            View and manage spelling cards in Anki
-            {total > 0 && ` (${total} total)`}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {DECK_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              onClick={() => handleDeckChange(opt.value)}
-              className={cn(
-                "rounded-md border px-3 py-1.5 text-sm font-medium transition-colors",
-                selectedDeck === opt.value
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-border text-muted-foreground hover:bg-muted"
-              )}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
+      <div>
+        <h2 className="text-2xl font-bold tracking-tight">Browse Cards</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {selectedDeck}
+          {total > 0 && ` — ${total} cards`}
+        </p>
       </div>
 
       {/* Search bar */}

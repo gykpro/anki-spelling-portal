@@ -705,13 +705,15 @@ These tests verify the skill scripts work correctly via command line.
 - Verify System Status shows note type badges for both EN and CN
 - Verify both "school spelling" and "school Chinese spelling" show green when configured
 
-### 12b. Browse — Deck selector
-- Navigate to `/browse`
-- Verify deck toggle buttons appear (English / Chinese)
-- Click "Chinese" — verify cards from "Gao Chinese" deck load
-- Click "English" — verify cards from "Gao English Spelling" deck load
+### 12b. Browse — Deck navigation via sidebar
+- Navigate to `/` — verify sidebar shows deck sub-items under "Browse": "Gao English Spelling (N)" and "Gao Chinese (N)" with card counts
+- Click "Gao Chinese" sub-item — verify URL is `/browse?deck=Gao%20Chinese`, Chinese cards load, header shows "Gao Chinese — N cards"
+- Click "Gao English Spelling" sub-item — verify English cards load, header shows "Gao English Spelling — N cards"
+- Click "Browse" itself — verify defaults to English deck (no `?deck=` param)
+- Navigate directly to `/browse?deck=Gao%20Chinese` — verify Chinese deck loads
+- Verify active deck sub-item is highlighted in sidebar
 - Verify search, filters, and pagination work on each deck independently
-- Verify switching decks resets selection and search
+- Verify switching decks via sidebar resets selection and search
 
 ### 12c. Quick Add — Chinese auto-detection
 - Navigate to `/quick-add`
