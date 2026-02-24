@@ -111,25 +111,17 @@ export function pinyinToNumbered(pinyin: string): string {
     .join(" ");
 }
 
-/** Build SSML with pinyin phoneme for Chinese TTS */
+/** Build SSML for Chinese TTS — no phoneme tag, the zh-CN voice handles characters natively */
 function buildChineseSsml(
   text: string,
-  pinyin: string | undefined,
+  _pinyin: string | undefined,
   voice: string,
   lang: string,
   rate: string
 ): string {
-  if (pinyin) {
-    const numbered = pinyinToNumbered(pinyin);
-    return `<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='${lang}'>
-  <voice name='${voice}'>
-    <prosody rate='${rate}'>
-      <phoneme alphabet='sapi' ph='${escapeXml(numbered)}'>${escapeXml(text)}</phoneme>
-    </prosody>
-  </voice>
-</speak>`;
-  }
-  // No pinyin — let Azure figure it out
+  // Azure zh-CN voices pronounce Chinese characters correctly without phoneme hints.
+  // The sapi phonetic set for zh-CN uses specific phone symbols (not numbered pinyin),
+  // so we skip the <phoneme> tag to avoid 400 errors.
   return `<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='${lang}'>
   <voice name='${voice}'>
     <prosody rate='${rate}'>${escapeXml(text)}</prosody>
