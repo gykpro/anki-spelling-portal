@@ -28,6 +28,12 @@ Follow this order for every feature request or change:
 - After fixing a bug
 - Do NOT commit broken or untested code
 
+## Service Restart
+
+- **Always restart the dev server** (`npm run dev`) after committing a feature change. The Telegram bot and other services load code at startup and won't pick up changes without a restart.
+- Kill the existing process on port 3000 before restarting.
+- Verify the server is healthy after restart by checking `/api/health`.
+
 ## Testing Conventions
 
 - Test plan lives at `tests/ui-test-plan.md`
