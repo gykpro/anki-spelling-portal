@@ -15,6 +15,7 @@
 ## Pending
 
 ## Recently Completed
+- [x] **Deck-Based Browse Navigation** — Replaced deck toggle buttons on Browse page with always-visible deck sub-items under Browse in the sidebar nav. Each deck shows card count. Browse page reads `?deck=` from URL.
 - [x] **Chinese Spelling Support** — Full Chinese language support: language auto-detection, Chinese note type/deck, Browse deck selector, Chinese enrichment prompts (pinyin, Chinese definitions, Chinese synonyms), Chinese TTS with SSML pinyin pronunciation, stroke order GIF generation from MDBG, Telegram Chinese auto-detection. All 8 phases complete.
 - [x] **PDF Upload Support** — Added PDF support end-to-end: portal upload dropzone, extract API, Anthropic SDK (document blocks), Telegram bot (document handler). Improved vision error message for CLI mode.
 - [x] **Distribute Media Files to All Profiles** — Media files (audio MP3s, images) are now stored in each target profile's `collection.media/` during distribution, fixing broken audio/images in non-home profiles.
