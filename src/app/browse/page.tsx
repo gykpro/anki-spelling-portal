@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { Suspense, useState, useEffect, useCallback, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { Search, RefreshCw, Filter } from "lucide-react";
 import { NoteTable } from "@/components/browse/NoteTable";
@@ -26,6 +26,14 @@ function getFieldValue(note: AnkiNote, field: string): string {
 }
 
 export default function BrowsePage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center py-12"><LoadingSpinner /></div>}>
+      <BrowseContent />
+    </Suspense>
+  );
+}
+
+function BrowseContent() {
   const searchParams = useSearchParams();
   const selectedDeck = searchParams.get("deck") || DEFAULT_DECK;
 
