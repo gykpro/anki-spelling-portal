@@ -15,6 +15,7 @@
 ## Pending
 
 ## Recently Completed
+- [x] **Chunked Text Enrichment** — batchEnrichText() now chunks words into groups of 15 to prevent 120s CLI timeout on large batches (40+ words). Both pipeline functions show per-chunk progress. MAX_PIPELINE_WORDS=50 cap (post-dedup) prevents unbounded processing.
 - [x] **Deck-Based Browse Navigation** — Replaced deck toggle buttons on Browse page with always-visible deck sub-items under Browse in the sidebar nav. Each deck shows card count. Browse page reads `?deck=` from URL.
 - [x] **Chinese Spelling Support** — Full Chinese language support: language auto-detection, Chinese note type/deck, Browse deck selector, Chinese enrichment prompts (pinyin, Chinese definitions, Chinese synonyms), Chinese TTS with SSML pinyin pronunciation, stroke order GIF generation from MDBG, Telegram Chinese auto-detection. All 8 phases complete.
 - [x] **PDF Upload Support** — Added PDF support end-to-end: portal upload dropzone, extract API, Anthropic SDK (document blocks), Telegram bot (document handler). Improved vision error message for CLI mode.
