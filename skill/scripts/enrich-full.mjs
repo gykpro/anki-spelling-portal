@@ -17,11 +17,13 @@ import {
   mapEnrichResultToAnkiFields,
   saveToAnki,
 } from "./lib/anki-fields.mjs";
+import { resolveLanguage } from "./lib/lang-config.mjs";
 
 const { values } = parseArgs({
   options: {
     noteIds: { type: "string" },
     words: { type: "string" },
+    lang: { type: "string" },
   },
   strict: false,
 });
@@ -30,12 +32,14 @@ async function main() {
   await checkHealth();
 
   let notes;
+  let lang;
 
   if (values.words) {
     const words = values.words.split(",").map((w) => w.trim()).filter(Boolean);
+    lang = resolveLanguage(values.lang, words[0]);
 
     // Check duplicates and create new notes for unknown words
-    const dupCheck = await checkDuplicates(words);
+    const dupCheck = await checkDuplicates(words, lang);
     if (dupCheck.duplicates.length > 0) {
       process.stderr.write(
         `Found existing: ${dupCheck.duplicates.join(", ")}\n`
@@ -44,16 +48,17 @@ async function main() {
 
     if (dupCheck.newWords.length > 0) {
       process.stderr.write(`Creating notes for: ${dupCheck.newWords.join(", ")}\n`);
-      await createNotes(dupCheck.newWords);
+      await createNotes(dupCheck.newWords, lang);
     }
 
     // Resolve all words (existing + newly created) to note objects
-    notes = await resolveWordsToNotes(words);
+    notes = await resolveWordsToNotes(words, lang);
     if (notes.length === 0) {
       process.stderr.write("Error: no notes could be resolved\n");
       process.exit(2);
     }
   } else if (values.noteIds) {
+    lang = resolveLanguage(values.lang);
     const ids = values.noteIds.split(",").map((id) => parseInt(id.trim(), 10)).filter((id) => !isNaN(id));
     const data = await get(
       `/api/anki/notes?q=${encodeURIComponent(`nid:${ids.join(" OR nid:")}`)}&limit=${ids.length}`
@@ -68,13 +73,15 @@ async function main() {
     process.exit(2);
   }
 
+  process.stderr.write(`Language: ${lang.id} (deck: ${lang.deck})\n`);
+
   const results = [];
   let totalSucceeded = 0;
   let totalFailed = 0;
 
   // Phase 1: Batch text enrichment
   process.stderr.write(`\n=== Phase 1: Text enrichment (${notes.length} cards) ===\n`);
-  const textFields = ["sentence", "definition", "phonetic", "synonyms", "extra_info"];
+  const textFields = lang.textFields;
   const cards = notes.map((n) => ({
     noteId: n.noteId,
     word: n.word,
@@ -156,6 +163,26 @@ async function main() {
       process.stderr.write(`  OK image: "${note.word}"\n`);
     } catch (err) {
       process.stderr.write(`  FAIL image: "${note.word}" — ${err.message}\n`);
+    }
+  }
+
+  // Phase 4: Stroke order (Chinese only)
+  if (lang.extraMediaSteps.includes("strokeOrder")) {
+    process.stderr.write(`\n=== Phase 4: Stroke order (${notes.length} cards) ===\n`);
+    for (const note of notes) {
+      try {
+        const enrichResult = await post("/api/enrich", {
+          noteId: note.noteId,
+          word: note.word,
+          fields: ["strokeOrder"],
+        });
+        if (enrichResult.strokeOrder_error) {
+          throw new Error(enrichResult.strokeOrder_error);
+        }
+        process.stderr.write(`  OK stroke: "${note.word}"\n`);
+      } catch (err) {
+        process.stderr.write(`  FAIL stroke: "${note.word}" — ${err.message}\n`);
+      }
     }
   }
 

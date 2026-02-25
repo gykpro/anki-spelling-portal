@@ -14,11 +14,13 @@ import {
   mapEnrichResultToAnkiFields,
   saveToAnki,
 } from "./lib/anki-fields.mjs";
+import { resolveLanguage } from "./lib/lang-config.mjs";
 
 const { values } = parseArgs({
   options: {
     noteIds: { type: "string" },
     words: { type: "string" },
+    lang: { type: "string" },
   },
   strict: false,
 });
@@ -29,7 +31,8 @@ async function main() {
   let notes;
   if (values.words) {
     const words = values.words.split(",").map((w) => w.trim()).filter(Boolean);
-    notes = await resolveWordsToNotes(words);
+    const lang = resolveLanguage(values.lang, words[0]);
+    notes = await resolveWordsToNotes(words, lang);
     if (notes.length === 0) {
       process.stderr.write("Error: none of the specified words were found in Anki\n");
       process.exit(2);

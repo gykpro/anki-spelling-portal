@@ -86,7 +86,11 @@ export async function checkHealth() {
   if (!data.ok) {
     const issues = [];
     if (!data.checks?.ankiConnect) issues.push("AnkiConnect unreachable");
-    if (!data.checks?.modelExists) issues.push('Note type "school spelling" not found');
+    const langs = data.checks?.languages || {};
+    const anyLangReady = Object.values(langs).some((l) => l.deck && l.model);
+    if (!anyLangReady) {
+      issues.push("No spelling deck/note type found");
+    }
     throw new Error(
       `Portal health check failed: ${issues.join(", ")}.\n  Ensure Anki is running with AnkiConnect enabled.`
     );

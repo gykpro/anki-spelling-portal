@@ -17,14 +17,14 @@ import {
   mapEnrichResultToAnkiFields,
   saveToAnki,
 } from "./lib/anki-fields.mjs";
-
-const DEFAULT_FIELDS = ["sentence", "definition", "phonetic", "synonyms", "extra_info"];
+import { resolveLanguage } from "./lib/lang-config.mjs";
 
 const { values } = parseArgs({
   options: {
     noteIds: { type: "string" },
     words: { type: "string" },
     fields: { type: "string" },
+    lang: { type: "string" },
   },
   strict: false,
 });
@@ -34,14 +34,17 @@ async function main() {
 
   // Resolve targets
   let notes;
+  let lang;
   if (values.words) {
     const words = values.words.split(",").map((w) => w.trim()).filter(Boolean);
-    notes = await resolveWordsToNotes(words);
+    lang = resolveLanguage(values.lang, words[0]);
+    notes = await resolveWordsToNotes(words, lang);
     if (notes.length === 0) {
       process.stderr.write("Error: none of the specified words were found in Anki\n");
       process.exit(2);
     }
   } else if (values.noteIds) {
+    lang = resolveLanguage(values.lang);
     const ids = values.noteIds.split(",").map((id) => parseInt(id.trim(), 10)).filter((id) => !isNaN(id));
     // Fetch note info for these IDs
     const data = await import("./lib/api.mjs").then((m) =>
@@ -59,7 +62,7 @@ async function main() {
 
   const fields = values.fields
     ? values.fields.split(",").map((f) => f.trim())
-    : DEFAULT_FIELDS;
+    : lang.textFields;
 
   process.stderr.write(`Enriching ${notes.length} card(s) with fields: ${fields.join(", ")}\n`);
 

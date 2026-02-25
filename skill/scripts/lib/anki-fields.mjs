@@ -38,6 +38,7 @@ export async function mapEnrichResultToAnkiFields(noteId, word, result) {
   }
 
   if (result.extra_info) fields["Extra information"] = String(result.extra_info);
+  if (result.sentencePinyin) fields["Main Sentence Pinyin"] = String(result.sentencePinyin);
 
   // Store image media
   if (result.image && typeof result.image === "object") {
@@ -100,9 +101,10 @@ export async function saveToAnki(noteId, fields) {
  * @param {string[]} words
  * @returns {Promise<Array<{noteId: number, word: string, sentence: string}>>}
  */
-export async function resolveWordsToNotes(words) {
+export async function resolveWordsToNotes(words, lang) {
+  const deck = lang?.deck || "Gao English Spelling";
   const data = await get(
-    `/api/anki/notes?q=${encodeURIComponent('deck:"Gao English Spelling"')}&limit=5000`
+    `/api/anki/notes?q=${encodeURIComponent(`deck:"${deck}"`)}&limit=5000`
   );
   const notes = data.notes || [];
   const results = [];
@@ -130,33 +132,29 @@ export async function resolveWordsToNotes(words) {
  * Check which words already exist in Anki.
  * Returns { duplicates: string[], newWords: string[] }
  */
-export async function checkDuplicates(words) {
+export async function checkDuplicates(words, lang) {
+  const deck = lang?.deck || "Gao English Spelling";
   const param = words.map((w) => w.trim()).join(",");
-  return get(`/api/anki/notes?checkDuplicates=${encodeURIComponent(param)}`);
+  return get(`/api/anki/notes?checkDuplicates=${encodeURIComponent(param)}&deck=${encodeURIComponent(deck)}`);
 }
 
 /**
  * Create new notes in Anki for the given words.
  * Returns array of created note IDs (null for failures).
  */
-export async function createNotes(words) {
+export async function createNotes(words, lang) {
+  const deckName = lang?.deck || "Gao English Spelling";
+  const modelName = lang?.noteType || "school spelling";
+  const templateFields = lang?.noteFields || {
+    Word: "", "Main Sentence": "", Cloze: "", "Phonetic symbol": "",
+    Audio: "", "Main Sentence Audio": "", Definition: "", "Extra information": "",
+    Picture: "", Synonyms: "", "Note ID": "", is_dictation_mem: "",
+  };
+
   const notes = words.map((word) => ({
-    deckName: "Gao English Spelling",
-    modelName: "school spelling",
-    fields: {
-      Word: word,
-      "Main Sentence": "",
-      Cloze: "",
-      "Phonetic symbol": "",
-      Audio: "",
-      "Main Sentence Audio": "",
-      Definition: "",
-      "Extra information": "",
-      Picture: "",
-      Synonyms: "",
-      "Note ID": crypto.randomUUID(),
-      is_dictation_mem: "",
-    },
+    deckName,
+    modelName,
+    fields: { ...templateFields, Word: word, "Note ID": crypto.randomUUID() },
     tags: ["skill_add"],
   }));
   const data = await post("/api/anki/notes", { notes });

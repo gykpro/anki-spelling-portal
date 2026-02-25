@@ -13,11 +13,13 @@ import { readFileSync } from "node:fs";
 import { basename } from "node:path";
 import { checkHealth, postFormData } from "./lib/api.mjs";
 import { checkDuplicates, createNotes, resolveWordsToNotes } from "./lib/anki-fields.mjs";
+import { resolveLanguage } from "./lib/lang-config.mjs";
 
 const { values } = parseArgs({
   options: {
     images: { type: "string" },
     enrich: { type: "boolean", default: false },
+    lang: { type: "string" },
   },
   strict: false,
 });
@@ -89,7 +91,8 @@ async function main() {
   process.stderr.write("\n=== Creating notes and enriching ===\n");
 
   const allWords = pages.flatMap((p) => (p.sentences || []).map((s) => s.word));
-  const dupCheck = await checkDuplicates(allWords);
+  const lang = resolveLanguage(values.lang, allWords[0]);
+  const dupCheck = await checkDuplicates(allWords, lang);
 
   if (dupCheck.duplicates.length > 0) {
     process.stderr.write(`  Already exist: ${dupCheck.duplicates.join(", ")}\n`);
@@ -97,7 +100,7 @@ async function main() {
 
   if (dupCheck.newWords.length > 0) {
     process.stderr.write(`  Creating: ${dupCheck.newWords.join(", ")}\n`);
-    await createNotes(dupCheck.newWords);
+    await createNotes(dupCheck.newWords, lang);
   }
 
   // Run the full enrichment pipeline via child process
@@ -108,8 +111,13 @@ async function main() {
   const __dirname = dirname(fileURLToPath(import.meta.url));
   const enrichScript = resolve(__dirname, "enrich-full.mjs");
 
+  const args = [enrichScript, "--words", allWords.join(",")];
+  if (lang.id !== "english") {
+    args.push("--lang", lang.id);
+  }
+
   try {
-    const output = execFileSync("node", [enrichScript, "--words", allWords.join(",")], {
+    const output = execFileSync("node", args, {
       encoding: "utf-8",
       stdio: ["inherit", "pipe", "inherit"],
       timeout: 600000, // 10 minutes
