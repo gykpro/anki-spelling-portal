@@ -201,11 +201,13 @@ export const ankiConnect = {
         const decksNow = await invoke<string[]>("deckNames");
         // If deck list changed, the switch completed
         if (JSON.stringify(decksNow) !== JSON.stringify(decksBefore)) {
+          await delay(1000); // Let Anki fully settle after switch
           return;
         }
         // If decks are the same (same profile or identical deck setup),
         // accept after a reasonable wait
         if (Date.now() - start >= 3000) {
+          await delay(1000); // Let Anki fully settle
           return;
         }
       } catch {
@@ -215,6 +217,7 @@ export const ankiConnect = {
     }
     // Even if we couldn't confirm the switch, proceed after timeout
     // (the profile may have the same deck setup)
+    await delay(1000); // Let Anki fully settle even on timeout path
   },
 
   /** Request a sync */
