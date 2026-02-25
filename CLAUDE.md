@@ -8,8 +8,9 @@ Follow this order for every feature request or change:
 2. **Implement** — Write the code following the approved plan.
 3. **Update tests** — If the change affects UI behavior, update `tests/ui-test-plan.md` to reflect new or modified scenarios. Add new sections for new features, revise existing steps for changed behavior, remove obsolete cases.
 4. **Self-test** — Always run the UI test plan sections related to the new/changed features via browser automation. This is mandatory, not optional. Report results in a table. Fix any failures before proceeding.
-5. **Commit** — After tests pass, create a git commit with a descriptive message summarizing the change.
-6. **CRITICAL — Continue** — NEVER stop after a commit. Always do one of: (a) if there are more features to implement, immediately start the next one (back to step 1); (b) if unsure what to do next, use `AskUserQuestion` with a menu of options. You must NEVER end your turn silently after step 5. Stopping without asking is a workflow violation.
+5. **Update Skill** - The project provides a skill for agents who wants to utilise the capabilities. Always check if the usage of new features are covered in generated skill document
+6. **Commit** — After tests pass, create a git commit with a descriptive message summarizing the change.
+7. **CRITICAL — Continue** — NEVER stop after a commit. Always do one of: (a) if there are more features to implement, immediately start the next one (back to step 1); (b) if unsure what to do next, use `AskUserQuestion` with a menu of options. You must NEVER end your turn silently after step 5. Stopping without asking is a workflow violation.
 
 ## Task Tracking
 
@@ -44,8 +45,19 @@ Follow this order for every feature request or change:
 
 ## Tech Stack Reminders
 
-- Anthropic SDK (`@anthropic-ai/sdk`) via `src/lib/anthropic.ts` for all AI calls (enrichment, extraction)
+- Prioritise Claude Code CLI for AI calls, since it's subscription based
 - Anki is source of truth — no database
 - Image generation via Gemini API directly (not through Claude)
 - Audio generation via Azure TTS
 - Deployable via Docker (see `docs/nas-setup.md`)
+
+## Memory Protocol
+
+At the start of every session:
+1. Read MEMORY.md from the auto-memory directory
+2. Check for any topic files (debugging.md, patterns.md, etc.)
+
+After completing work:
+1. Save important decisions, patterns, and context to MEMORY.md
+2. Create topic files for detailed notes on specific areas
+3. Update or remove outdated memories
