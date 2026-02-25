@@ -48,3 +48,6 @@ next-env.d.ts
 
 # release artifacts
 /releases/
+
+# local deploy config (contains NAS credentials)
+scripts/deploy-nas.sh
