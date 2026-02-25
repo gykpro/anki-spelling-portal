@@ -237,6 +237,11 @@ Requirements:
   throw new Error("No image returned from Gemini");
 }
 
+// ─── Constants ───
+
+const ENRICH_CHUNK_SIZE = 15; // Max words per AI call (fits comfortably in 120s timeout)
+const MAX_PIPELINE_WORDS = 50; // Max new words per pipeline run (post-dedup)
+
 // ─── Batch text enrichment ───
 
 export function extractJsonArray(text: string): Record<string, unknown>[] {
@@ -364,48 +369,63 @@ export async function createWordNotes(
   return created;
 }
 
-/** Batch enrich text fields for given notes via AI */
+/** Batch enrich text fields for given notes via AI (with automatic chunking) */
 export async function batchEnrichText(
   cards: { noteId: number; word: string; sentence?: string }[],
   fields?: TextEnrichField[],
-  lang?: LanguageConfig
+  lang?: LanguageConfig,
+  onChunkProgress?: (chunkIndex: number, totalChunks: number) => void
 ): Promise<BatchEnrichResultItem[]> {
   const language = lang ?? getLanguageById("english");
   const enrichFields = fields ?? getTextFieldsForLanguage(language);
-  const prompt = buildBatchPrompt(cards, enrichFields, language);
-  const rawText = await runAI(prompt);
-  const parsed = extractJsonArray(rawText);
 
-  const results: BatchEnrichResultItem[] = [];
-  for (let i = 0; i < cards.length; i++) {
-    const card = cards[i];
-    const result =
-      parsed[i] ||
-      parsed.find(
-        (r) =>
-          r.word && String(r.word).toLowerCase() === card.word.toLowerCase()
-      );
+  // Split into chunks
+  const chunks: typeof cards[] = [];
+  for (let i = 0; i < cards.length; i += ENRICH_CHUNK_SIZE) {
+    chunks.push(cards.slice(i, i + ENRICH_CHUNK_SIZE));
+  }
 
-    if (result) {
-      results.push({
-        noteId: card.noteId,
-        word: card.word,
-        sentence: result.sentence as string | undefined,
-        definition: result.definition as string | undefined,
-        phonetic: result.phonetic as string | undefined,
-        synonyms: result.synonyms as string[] | undefined,
-        extra_info: result.extra_info as string | undefined,
-        sentencePinyin: result.sentencePinyin as string | undefined,
-      });
-    } else {
-      results.push({
-        noteId: card.noteId,
-        word: card.word,
-        error: "No result returned for this word",
-      });
+  const allResults: BatchEnrichResultItem[] = [];
+
+  for (let ci = 0; ci < chunks.length; ci++) {
+    const chunk = chunks[ci];
+    onChunkProgress?.(ci + 1, chunks.length);
+
+    const prompt = buildBatchPrompt(chunk, enrichFields, language);
+    const rawText = await runAI(prompt);
+    const parsed = extractJsonArray(rawText);
+
+    for (let i = 0; i < chunk.length; i++) {
+      const card = chunk[i];
+      const result =
+        parsed[i] ||
+        parsed.find(
+          (r) =>
+            r.word && String(r.word).toLowerCase() === card.word.toLowerCase()
+        );
+
+      if (result) {
+        allResults.push({
+          noteId: card.noteId,
+          word: card.word,
+          sentence: result.sentence as string | undefined,
+          definition: result.definition as string | undefined,
+          phonetic: result.phonetic as string | undefined,
+          synonyms: result.synonyms as string[] | undefined,
+          extra_info: result.extra_info as string | undefined,
+          sentencePinyin: result.sentencePinyin as string | undefined,
+        });
+      } else {
+        allResults.push({
+          noteId: card.noteId,
+          word: card.word,
+          error: "No result returned for this word",
+        });
+      }
     }
   }
-  return results;
+
+  return allResults;
 }
 
 /** Save enriched text fields to Anki for a single note */
@@ -575,10 +595,19 @@ export async function runFullPipeline(
   // 1. Check duplicates
   await progress.update(`[${language.label}] Checking duplicates for ${words.length} words...`);
   const dupes = await checkDuplicates(words, language);
-  const newWords = words.filter((w) => !dupes.has(w.toLowerCase()));
+  let newWords = words.filter((w) => !dupes.has(w.toLowerCase()));
 
   if (newWords.length === 0) {
     return { created: 0, duplicates: dupes.size, errors };
+  }
+
+  // Cap at MAX_PIPELINE_WORDS
+  if (newWords.length > MAX_PIPELINE_WORDS) {
+    const totalNew = newWords.length;
+    newWords = newWords.slice(0, MAX_PIPELINE_WORDS);
+    await progress.send(
+      `Processing first ${MAX_PIPELINE_WORDS} of ${totalNew} new words. Send all words again to process the rest (duplicates are auto-skipped).`
+    );
   }
 
   await progress.update(
@@ -592,7 +621,7 @@ export async function runFullPipeline(
     return { created: 0, duplicates: dupes.size, errors: ["Failed to create any notes"] };
   }
 
-  // 3. Enrich text fields
+  // 3. Enrich text fields (chunked)
   await progress.update(
     `[${language.label}] Enriching text for ${created.length} words...`
   );
@@ -601,7 +630,12 @@ export async function runFullPipeline(
     enrichResults = await batchEnrichText(
       created,
       undefined,
-      language
+      language,
+      (chunk, total) => {
+        if (total > 1) {
+          progress.update(`[${language.label}] Enriching text (chunk ${chunk}/${total})...`);
+        }
+      }
     );
   } catch (err) {
     errors.push(`Text enrichment failed: ${err instanceof Error ? err.message : String(err)}`);
@@ -707,10 +741,19 @@ export async function runFullPipelineFromExtraction(
     `[${language.label}] Checking duplicates for ${allItems.length} extracted words...`
   );
   const dupes = await checkDuplicates(allItems.map((i) => i.word), language);
-  const newItems = allItems.filter((i) => !dupes.has(i.word.toLowerCase()));
+  let newItems = allItems.filter((i) => !dupes.has(i.word.toLowerCase()));
 
   if (newItems.length === 0) {
     return { created: 0, duplicates: dupes.size, errors };
+  }
+
+  // Cap at MAX_PIPELINE_WORDS
+  if (newItems.length > MAX_PIPELINE_WORDS) {
+    const totalNew = newItems.length;
+    newItems = newItems.slice(0, MAX_PIPELINE_WORDS);
+    await progress.send(
+      `Processing first ${MAX_PIPELINE_WORDS} of ${totalNew} new words. Send all words again to process the rest (duplicates are auto-skipped).`
+    );
   }
 
   await progress.update(
@@ -772,7 +815,12 @@ export async function runFullPipelineFromExtraction(
         sentence: c.sentence || undefined,
       })),
       enrichFields,
-      language
+      language,
+      (chunk, total) => {
+        if (total > 1) {
+          progress.update(`[${language.label}] Enriching text (chunk ${chunk}/${total})...`);
+        }
+      }
     );
   } catch (err) {
     errors.push(`Text enrichment failed: ${err instanceof Error ? err.message : String(err)}`);

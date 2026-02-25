@@ -9,7 +9,7 @@ import type {
 } from "@/types/enrichment";
 import { getLanguageByNoteType, type LanguageConfig } from "@/lib/languages";
 
-const MAX_BATCH_SIZE = 20;
+const MAX_BATCH_SIZE = 15;
 
 export async function POST(request: NextRequest) {
   try {
