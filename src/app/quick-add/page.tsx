@@ -69,7 +69,7 @@ export default function QuickAddPage() {
   const [distributing, setDistributing] = useState(false);
 
   const words = wordsInput
-    .split(/[,\n]/)
+    .split(/[,，、\n]/)
     .map((w) => w.trim())
     .filter(Boolean);
 
