@@ -95,9 +95,17 @@ class WordQueue {
         // Non-critical — the queue still works without the status message
       }
     } else if (!q.draining) {
-      // Additional words — update status message
+      // Additional words — reset timer from now
+      if (q.timer) {
+        clearTimeout(q.timer);
+      }
+      q.timer = setTimeout(() => this.drain(chatId), DRAIN_TIMEOUT_MS);
+
+      // Send confirmation with buttons
       try {
-        await this.api.sendMessage(chatId, `Words added (${q.entries.length} queued)`);
+        await this.api.sendMessage(chatId, `Words added (${q.entries.length} queued)`, {
+          reply_markup: this.buildStatusKeyboard(),
+        });
       } catch {
         // ignore
       }
