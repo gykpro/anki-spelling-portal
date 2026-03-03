@@ -80,10 +80,15 @@ export async function startTelegramBot(): Promise<void> {
 
   globalForBot.__telegramBot = bot;
 
-  // Validate token by calling getMe before starting polling
+  // Validate token and register command menu
   try {
     const me = await bot.api.getMe();
     console.log(`[Telegram] Bot authenticated as @${me.username}`);
+    await bot.api.setMyCommands([
+      { command: "start", description: "Start the bot" },
+      { command: "help", description: "Show usage help" },
+      { command: "lang", description: "Change bot language / 切换语言" },
+    ]);
   } catch (err) {
     console.error(
       `[Telegram] Invalid bot token: ${err instanceof Error ? err.message : String(err)}`
