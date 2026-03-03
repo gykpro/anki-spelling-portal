@@ -24,7 +24,7 @@ export function detectIntent(text: string): Intent {
 
   // Split by newlines, commas, semicolons, or Chinese enumeration comma
   const parts = trimmed
-    .split(/[\n,;、]+/)
+    .split(/[\n,;、，]+/)
     .map((p) => p.trim())
     .filter((p) => p.length > 0);
 
