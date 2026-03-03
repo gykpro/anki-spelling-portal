@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { runAI } from "@/lib/ai";
 import { ankiConnect } from "@/lib/anki-connect";
+import { writeQueue } from "@/lib/write-queue";
 import { extractJsonArray, buildBatchPrompt } from "@/lib/enrichment-pipeline";
 import type {
   BatchEnrichRequest,
@@ -34,56 +35,57 @@ export async function POST(request: NextRequest) {
       // Fall through — use default (English)
     }
 
-    await ankiConnect.syncBeforeWrite();
+    const allResults = await writeQueue.enqueue(async () => {
+      await ankiConnect.syncBeforeWrite();
 
-    // Process in chunks of MAX_BATCH_SIZE
-    const allResults: BatchEnrichResultItem[] = [];
+      const results: BatchEnrichResultItem[] = [];
 
-    for (let i = 0; i < cards.length; i += MAX_BATCH_SIZE) {
-      const chunk = cards.slice(i, i + MAX_BATCH_SIZE);
-      const prompt = buildBatchPrompt(chunk, fields, lang);
+      for (let i = 0; i < cards.length; i += MAX_BATCH_SIZE) {
+        const chunk = cards.slice(i, i + MAX_BATCH_SIZE);
+        const prompt = buildBatchPrompt(chunk, fields, lang);
 
-      try {
-        const rawText = await runAI(prompt);
-        const parsed = extractJsonArray(rawText);
+        try {
+          const rawText = await runAI(prompt);
+          const parsed = extractJsonArray(rawText);
 
-        // Match results back to cards by index (primary) or word (fallback)
-        for (let j = 0; j < chunk.length; j++) {
-          const card = chunk[j];
-          const result = parsed[j] || parsed.find(
-            (r) => r.word && String(r.word).toLowerCase() === card.word.toLowerCase()
-          );
+          for (let j = 0; j < chunk.length; j++) {
+            const card = chunk[j];
+            const result = parsed[j] || parsed.find(
+              (r) => r.word && String(r.word).toLowerCase() === card.word.toLowerCase()
+            );
 
-          if (result) {
-            allResults.push({
+            if (result) {
+              results.push({
+                noteId: card.noteId,
+                word: card.word,
+                sentence: result.sentence as string | undefined,
+                definition: result.definition as string | undefined,
+                phonetic: result.phonetic as string | undefined,
+                synonyms: result.synonyms as string[] | undefined,
+                extra_info: result.extra_info as string | undefined,
+                sentencePinyin: result.sentencePinyin as string | undefined,
+              });
+            } else {
+              results.push({
+                noteId: card.noteId,
+                word: card.word,
+                error: "No result returned for this word",
+              });
+            }
+          }
+        } catch (err) {
+          for (const card of chunk) {
+            results.push({
               noteId: card.noteId,
               word: card.word,
-              sentence: result.sentence as string | undefined,
-              definition: result.definition as string | undefined,
-              phonetic: result.phonetic as string | undefined,
-              synonyms: result.synonyms as string[] | undefined,
-              extra_info: result.extra_info as string | undefined,
-              sentencePinyin: result.sentencePinyin as string | undefined,
-            });
-          } else {
-            allResults.push({
-              noteId: card.noteId,
-              word: card.word,
-              error: "No result returned for this word",
+              error: err instanceof Error ? err.message : "Batch enrichment failed",
             });
           }
         }
-      } catch (err) {
-        // Entire chunk failed — mark all cards in chunk with error
-        for (const card of chunk) {
-          allResults.push({
-            noteId: card.noteId,
-            word: card.word,
-            error: err instanceof Error ? err.message : "Batch enrichment failed",
-          });
-        }
       }
-    }
+
+      return results;
+    });
 
     const succeeded = allResults.filter((r) => !r.error).length;
     const failed = allResults.filter((r) => !!r.error).length;

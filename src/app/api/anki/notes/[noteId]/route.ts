@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ankiConnect } from "@/lib/anki-connect";
+import { writeQueue } from "@/lib/write-queue";
 
 /** PUT: Update fields of an existing note */
 export async function PUT(
@@ -26,8 +27,10 @@ export async function PUT(
       );
     }
 
-    await ankiConnect.syncBeforeWrite();
-    await ankiConnect.updateNoteFields({ id: noteIdNum, fields });
+    await writeQueue.enqueue(async () => {
+      await ankiConnect.syncBeforeWrite();
+      await ankiConnect.updateNoteFields({ id: noteIdNum, fields });
+    });
 
     return NextResponse.json({ success: true });
   } catch (error) {

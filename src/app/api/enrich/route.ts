@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { runAIJSON } from "@/lib/ai";
 import { ankiConnect } from "@/lib/anki-connect";
+import { writeQueue } from "@/lib/write-queue";
 import {
   type TextEnrichField,
   getFieldDescriptions,
@@ -88,92 +89,95 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    await ankiConnect.syncBeforeWrite();
+    const results = await writeQueue.enqueue(async () => {
+      await ankiConnect.syncBeforeWrite();
 
-    const nonTextFields = new Set(["image", "audio", "sentence_audio", "strokeOrder"]);
-    const textFields = fields.filter((f) => !nonTextFields.has(f));
-    const needsImage = fields.includes("image");
-    const needsAudio = fields.includes("audio");
-    const needsSentenceAudio = fields.includes("sentence_audio");
-    const needsStrokeOrder = fields.includes("strokeOrder");
+      const nonTextFields = new Set(["image", "audio", "sentence_audio", "strokeOrder"]);
+      const textFields = fields.filter((f) => !nonTextFields.has(f));
+      const needsImage = fields.includes("image");
+      const needsAudio = fields.includes("audio");
+      const needsSentenceAudio = fields.includes("sentence_audio");
+      const needsStrokeOrder = fields.includes("strokeOrder");
 
-    const results: Record<string, unknown> = { noteId, word };
+      const r: Record<string, unknown> = { noteId, word };
 
-    // Generate text fields via AI backend
-    if (textFields.length > 0) {
-      const prompt = buildPrompt(word, sentence, textFields as EnrichField[], lang);
-      const parsed = await runAIJSON<Record<string, unknown>>(prompt);
-      Object.assign(results, parsed);
-    }
+      // Generate text fields via AI backend
+      if (textFields.length > 0) {
+        const prompt = buildPrompt(word, sentence, textFields as EnrichField[], lang);
+        const parsed = await runAIJSON<Record<string, unknown>>(prompt);
+        Object.assign(r, parsed);
+      }
 
-    // Generate image via Gemini API (requires sentence)
-    if (needsImage) {
-      const imgSentence = sentence || (results.sentence as string);
-      if (!imgSentence) {
-        results.image_error = "Sentence required for image generation";
-      } else {
-        try {
-          const imageResult = await generateImage(word, imgSentence);
-          results.image = imageResult;
-        } catch (err) {
-          results.image_error =
-            err instanceof Error ? err.message : "Image generation failed";
+      // Generate image via Gemini API (requires sentence)
+      if (needsImage) {
+        const imgSentence = sentence || (r.sentence as string);
+        if (!imgSentence) {
+          r.image_error = "Sentence required for image generation";
+        } else {
+          try {
+            const imageResult = await generateImage(word, imgSentence);
+            r.image = imageResult;
+          } catch (err) {
+            r.image_error =
+              err instanceof Error ? err.message : "Image generation failed";
+          }
         }
       }
-    }
 
-    // Generate stroke order GIFs (Chinese only)
-    if (needsStrokeOrder && noteId) {
-      try {
-        const strokeMedia = await generateAndSaveStrokeOrder(noteId, word);
-        results.strokeOrder = { count: strokeMedia.length };
-      } catch (err) {
-        results.strokeOrder_error =
-          err instanceof Error ? err.message : "Stroke order generation failed";
+      // Generate stroke order GIFs (Chinese only)
+      if (needsStrokeOrder && noteId) {
+        try {
+          const strokeMedia = await generateAndSaveStrokeOrder(noteId, word);
+          r.strokeOrder = { count: strokeMedia.length };
+        } catch (err) {
+          r.strokeOrder_error =
+            err instanceof Error ? err.message : "Stroke order generation failed";
+        }
       }
-    }
 
-    // Generate audio via Azure TTS (parallel when both requested)
-    // For Chinese, use pinyin for pronunciation guidance
-    const wordPinyin = lang?.id === "chinese"
-      ? (results.phonetic as string | undefined) || undefined
-      : undefined;
-    const sentPinyin = lang?.id === "chinese"
-      ? (results.sentencePinyin as string | undefined) || undefined
-      : undefined;
+      // Generate audio via Azure TTS (parallel when both requested)
+      const wordPinyin = lang?.id === "chinese"
+        ? (r.phonetic as string | undefined) || undefined
+        : undefined;
+      const sentPinyin = lang?.id === "chinese"
+        ? (r.sentencePinyin as string | undefined) || undefined
+        : undefined;
 
-    const audioPromises: Promise<void>[] = [];
+      const audioPromises: Promise<void>[] = [];
 
-    if (needsAudio) {
-      audioPromises.push(
-        generateTTS(word, "word", lang, wordPinyin)
-          .then((tts) => { results.audio = tts; })
-          .catch((err) => {
-            results.audio_error =
-              err instanceof Error ? err.message : "Audio generation failed";
-          })
-      );
-    }
-
-    if (needsSentenceAudio) {
-      const ttsText = sentence || (results.sentence as string);
-      if (!ttsText) {
-        results.sentence_audio_error = "Sentence required for sentence audio";
-      } else {
+      if (needsAudio) {
         audioPromises.push(
-          generateTTS(stripHtmlServer(ttsText), "sentence", lang, sentPinyin)
-            .then((tts) => { results.sentence_audio = tts; })
+          generateTTS(word, "word", lang, wordPinyin)
+            .then((tts) => { r.audio = tts; })
             .catch((err) => {
-              results.sentence_audio_error =
-                err instanceof Error ? err.message : "Sentence audio generation failed";
+              r.audio_error =
+                err instanceof Error ? err.message : "Audio generation failed";
             })
         );
       }
-    }
 
-    if (audioPromises.length > 0) {
-      await Promise.all(audioPromises);
-    }
+      if (needsSentenceAudio) {
+        const ttsText = sentence || (r.sentence as string);
+        if (!ttsText) {
+          r.sentence_audio_error = "Sentence required for sentence audio";
+        } else {
+          audioPromises.push(
+            generateTTS(stripHtmlServer(ttsText), "sentence", lang, sentPinyin)
+              .then((tts) => { r.sentence_audio = tts; })
+              .catch((err) => {
+                r.sentence_audio_error =
+                  err instanceof Error ? err.message : "Sentence audio generation failed";
+              })
+          );
+        }
+      }
+
+      if (audioPromises.length > 0) {
+        await Promise.all(audioPromises);
+      }
+
+      return r;
+    });
 
     return NextResponse.json(results);
   } catch (error) {

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ankiConnect } from "@/lib/anki-connect";
+import { writeQueue } from "@/lib/write-queue";
 import type { CreateNoteParams } from "@/types/anki";
 import { getLanguageById } from "@/lib/languages";
 
@@ -69,16 +70,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Sync before writing
-    await ankiConnect.syncBeforeWrite();
-
-    // Ensure deck exists
-    await ankiConnect.createDeck(notes[0].deckName);
-
-    const results = await ankiConnect.addNotes(notes);
-
-    const created = results.filter((id) => id !== null).length;
-    const failed = results.filter((id) => id === null).length;
+    const { results, created, failed } = await writeQueue.enqueue(async () => {
+      await ankiConnect.syncBeforeWrite();
+      await ankiConnect.createDeck(notes[0].deckName);
+      const r = await ankiConnect.addNotes(notes);
+      return {
+        results: r,
+        created: r.filter((id) => id !== null).length,
+        failed: r.filter((id) => id === null).length,
+      };
+    });
 
     return NextResponse.json({
       results,

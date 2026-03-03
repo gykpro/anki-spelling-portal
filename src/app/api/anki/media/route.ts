@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ankiConnect } from "@/lib/anki-connect";
+import { writeQueue } from "@/lib/write-queue";
 
 /** POST: Store a media file in Anki */
 export async function POST(request: NextRequest) {
@@ -14,7 +15,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const result = await ankiConnect.storeMediaFile(filename, data);
+    const result = await writeQueue.enqueue(() =>
+      ankiConnect.storeMediaFile(filename, data)
+    );
 
     return NextResponse.json({ filename: result });
   } catch (error) {
