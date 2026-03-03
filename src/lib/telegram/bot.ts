@@ -6,6 +6,7 @@ import { Bot } from "grammy";
 import { getConfig } from "@/lib/settings";
 import { registerHandlers } from "./handlers";
 import { wordQueue } from "./word-queue";
+import { t } from "./i18n";
 
 // Persist across HMR in dev
 const globalForBot = globalThis as unknown as {
@@ -66,7 +67,7 @@ export async function startTelegramBot(): Promise<void> {
     }
     // Unauthorized
     if (ctx.message) {
-      await ctx.reply("You are not authorized to use this bot.");
+      await ctx.reply(t(ctx.from?.id ?? 0, "not_authorized"));
     }
   });
 

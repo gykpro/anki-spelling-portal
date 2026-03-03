@@ -15,6 +15,7 @@
 ## Pending
 
 ## Recently Completed
+- [x] **Per-User Language Preference for Telegram Bot** — `/lang` command lets each user choose English or Chinese for all bot replies. Persisted per Telegram user ID in `data/telegram-user-prefs.json`. All bot strings go through `t(userId, key)` i18n function.
 - [x] **Queue Edit — Remove Words from Pending Queue** — "Edit Queue" button alongside "Start Now" lets users view and remove individual words before batch processing. Handles re-indexing, empty queue cleanup (timer cancellation + status message deletion), and "Done" dismissal.
 - [x] **Telegram Word Queue** — Words sent to the Telegram bot accumulate in a per-chat queue and batch-process after 60s or "Start Now" button click. Shares one enrichment round and distribution cycle per batch. Mixed languages processed as separate groups.
 - [x] **Chinese Skill Script Support** — Skill scripts (`skill/scripts/`) now auto-detect Chinese words (CJK range) and use the correct deck/model/fields. All scripts accept `--lang` flag. Chinese enrichment includes sentencePinyin and stroke order phases. SKILL.md updated.

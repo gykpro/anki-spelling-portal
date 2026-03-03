@@ -599,10 +599,28 @@ After all tests:
 - Verify status message is deleted (timer cancelled)
 - Wait 60+ seconds — verify no auto-drain occurs (no "Processing..." message)
 
+### 9i. Language preference — /lang command (manual)
+- Send `/lang` to the bot
+- Verify bot replies with "Choose your preferred language for bot responses:" and two inline buttons: [English] [中文]
+- Click [中文]
+- Verify message updates to "语言已设置为中文。" with keyboard removed
+- Send a single word: `__test_tg_lang1`
+- Verify status message is in Chinese: "已排队 1 个单词，等待 1 分钟收集更多..."
+- Verify buttons show Chinese text: [立即开始] [编辑队列]
+- Click [立即开始]
+- Verify processing message in Chinese: "正在处理 1 个单词..."
+- Verify result message in Chinese: "<b>完成！</b>" with Chinese labels
+- Send `/lang` again
+- Verify prompt is in Chinese: "选择机器人回复的语言："
+- Click [English]
+- Verify message updates to "Language set to English."
+- Send `__test_tg_lang2`
+- Verify all messages are back in English
+
 ### 9e. Unauthorized user (manual)
 - Set `TELEGRAM_ALLOWED_USERS` to a different user ID
 - Send a message from your account
-- Verify "You are not authorized to use this bot" reply
+- Verify "You are not authorized to use this bot" reply (or Chinese equivalent if language was set)
 
 ### 9f. Anki not reachable (manual)
 - Stop Anki

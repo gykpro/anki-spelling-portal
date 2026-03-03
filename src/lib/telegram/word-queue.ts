@@ -11,6 +11,7 @@ import type { LanguageConfig } from "@/lib/languages";
 import { writeQueue } from "@/lib/write-queue";
 import { runFullPipeline } from "@/lib/enrichment-pipeline";
 import { createApiProgressReporter } from "./progress";
+import { t } from "./i18n";
 
 export interface QueueEntry {
   word: string;
@@ -35,12 +36,12 @@ class WordQueue {
     this.api = api;
   }
 
-  private buildStatusKeyboard() {
+  private buildStatusKeyboard(chatId: number) {
     return {
       inline_keyboard: [
         [
-          { text: "Start Now", callback_data: "word_queue_start" },
-          { text: "Edit Queue", callback_data: "word_queue_edit" },
+          { text: t(chatId, "btn_start_now"), callback_data: "word_queue_start" },
+          { text: t(chatId, "btn_edit_queue"), callback_data: "word_queue_edit" },
         ],
       ],
     };
@@ -84,10 +85,10 @@ class WordQueue {
       try {
         const msg = await this.api.sendMessage(
           chatId,
-          `${q.entries.length} word(s) queued. Waiting 1 min for more...`,
+          t(chatId, "queue_waiting_first", q.entries.length),
           {
             parse_mode: "HTML",
-            reply_markup: this.buildStatusKeyboard(),
+            reply_markup: this.buildStatusKeyboard(chatId),
           }
         );
         q.statusMessageId = msg.message_id;
@@ -103,9 +104,13 @@ class WordQueue {
 
       // Send confirmation with buttons
       try {
-        await this.api.sendMessage(chatId, `Words added (${q.entries.length} queued)`, {
-          reply_markup: this.buildStatusKeyboard(),
-        });
+        await this.api.sendMessage(
+          chatId,
+          t(chatId, "queue_words_added", q.entries.length),
+          {
+            reply_markup: this.buildStatusKeyboard(chatId),
+          }
+        );
       } catch {
         // ignore
       }
@@ -115,9 +120,9 @@ class WordQueue {
           await this.api.editMessageText(
             chatId,
             q.statusMessageId,
-            `${q.entries.length} word(s) queued. Waiting for more...`,
+            t(chatId, "queue_waiting_more", q.entries.length),
             {
-              reply_markup: this.buildStatusKeyboard(),
+              reply_markup: this.buildStatusKeyboard(chatId),
             }
           );
         } catch {
@@ -129,7 +134,7 @@ class WordQueue {
       try {
         await this.api.sendMessage(
           chatId,
-          `Words added (${q.entries.length} queued for next batch)`
+          t(chatId, "queue_words_added_next", q.entries.length)
         );
       } catch {
         // ignore
@@ -160,7 +165,7 @@ class WordQueue {
         await this.api.editMessageText(
           chatId,
           q.statusMessageId,
-          `Processing ${entries.length} word(s)...`,
+          t(chatId, "queue_processing", entries.length),
           { reply_markup: { inline_keyboard: [] } }
         );
       } catch {
@@ -189,7 +194,7 @@ class WordQueue {
       try {
         const result = await writeQueue.enqueue(async () => {
           await progress.update(
-            `Adding ${group.words.length} word(s) → ${group.lang.label} (${group.lang.deck})...`
+            t(chatId, "queue_adding", group.words.length, group.lang.label, group.lang.deck)
           );
           return runFullPipeline(group.words, progress, group.lang);
         });
@@ -205,18 +210,18 @@ class WordQueue {
     }
 
     // 6. Send combined summary
-    const summaryLines: string[] = ["<b>Done!</b>"];
+    const summaryLines: string[] = [t(chatId, "result_done")];
     for (const r of allResults) {
       const parts: string[] = [];
       if (allResults.length > 1) parts.push(`<b>${r.lang}</b>`);
-      if (r.created > 0) parts.push(`Created: ${r.created} cards`);
-      if (r.duplicates > 0) parts.push(`Duplicates skipped: ${r.duplicates}`);
+      if (r.created > 0) parts.push(t(chatId, "result_created", r.created));
+      if (r.duplicates > 0) parts.push(t(chatId, "result_duplicates", r.duplicates));
       if (r.errors.length > 0) {
-        parts.push(`Errors: ${r.errors.length}`);
+        parts.push(t(chatId, "result_errors_header", r.errors.length));
         for (const e of r.errors.slice(0, 3)) parts.push(`  - ${e}`);
       }
       if (r.created > 0 && r.errors.length === 0) {
-        parts.push("All cards fully enriched with text, audio, and images.");
+        parts.push(t(chatId, "result_all_enriched"));
       }
       summaryLines.push(parts.join("\n"));
     }
@@ -235,10 +240,10 @@ class WordQueue {
       try {
         const msg = await this.api.sendMessage(
           chatId,
-          `${q.entries.length} word(s) queued. Waiting 1 min for more...`,
+          t(chatId, "queue_waiting_first", q.entries.length),
           {
             parse_mode: "HTML",
-            reply_markup: this.buildStatusKeyboard(),
+            reply_markup: this.buildStatusKeyboard(chatId),
           }
         );
         q.statusMessageId = msg.message_id;
@@ -292,8 +297,8 @@ class WordQueue {
       await this.api.editMessageText(
         chatId,
         q.statusMessageId,
-        `${q.entries.length} word(s) queued. Waiting for more...`,
-        { reply_markup: this.buildStatusKeyboard() }
+        t(chatId, "queue_waiting_more", q.entries.length),
+        { reply_markup: this.buildStatusKeyboard(chatId) }
       );
     } catch {
       // Edit may fail if text unchanged
