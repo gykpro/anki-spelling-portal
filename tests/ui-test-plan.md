@@ -506,11 +506,44 @@ After all tests:
 - Check terminal output for `[Telegram] Bot started (long-polling)`
 - If no token configured, verify `[Telegram] No bot token configured — skipping`
 
-### 9c. Word list via Telegram (manual)
-- Send a message to the bot: `__test_tg_word1, __test_tg_word2`
-- Verify bot replies with progress updates (checking duplicates, creating, enriching)
-- Verify final result message shows "Created: 2 cards"
-- In Browse page, verify `__test_tg_word1` and `__test_tg_word2` exist with enriched fields
+### 9c. Word queue — single word then Start Now (manual)
+- Send a single word to the bot: `__test_tg_queue1`
+- Verify bot replies with "1 word(s) queued. Waiting 1 min for more..." and a "Start Now" inline button
+- Click "Start Now" button
+- Verify status message updates to "Processing 1 word(s)..."
+- Verify progress updates (checking duplicates, creating, enriching, audio, images, distributing)
+- Verify final "Done!" summary with "Created: 1 cards"
+
+### 9c2. Word queue — multiple words batched (manual)
+- Send `__test_tg_batch1` to the bot
+- Verify "1 word(s) queued" with Start Now button
+- Quickly send `__test_tg_batch2`
+- Verify "Words added (2 queued)" confirmation and status message updates to "2 word(s) queued"
+- Send `__test_tg_batch3`
+- Verify "Words added (3 queued)" and status updates to "3 word(s) queued"
+- Click "Start Now"
+- Verify all 3 words processed in one batch (one enrichment round, not three separate ones)
+- Verify "Done!" summary shows "Created: 3 cards"
+
+### 9c3. Word queue — comma-separated words (manual)
+- Send `__test_tg_comma1, __test_tg_comma2` (two words in one message)
+- Verify "2 word(s) queued. Waiting 1 min for more..."
+- Click "Start Now"
+- Verify both words processed as a batch
+
+### 9c4. Word queue — auto-drain timeout (manual)
+- Send `__test_tg_timeout1` to the bot
+- Verify "1 word(s) queued" with Start Now button
+- Wait 60 seconds without clicking Start Now
+- Verify the queue auto-drains and processes the word
+- Verify "Done!" summary appears
+
+### 9c5. Word queue — photo triggers drain (manual)
+- Send `__test_tg_photodrain` to the bot
+- Verify "1 word(s) queued" with Start Now button
+- Send a worksheet photo to the bot
+- Verify pending word drains first (processes __test_tg_photodrain)
+- Verify photo then processes separately (extraction + enrichment)
 
 ### 9d. Photo extraction via Telegram (manual)
 - Send a worksheet photo to the bot
@@ -526,6 +559,15 @@ After all tests:
 ### 9h. Non-PDF document via Telegram (manual)
 - Send a non-image, non-PDF document (e.g., .txt file) to the bot
 - Verify bot replies with usage help (not an error)
+
+### 9c6. Word queue — mixed languages (manual)
+- Send `__test_tg_mixed_en` to the bot
+- Verify "1 word(s) queued" with Start Now button
+- Send `__test_混合测试` (Chinese word)
+- Verify "Words added (2 queued)"
+- Click "Start Now"
+- Verify English and Chinese processed as separate groups
+- Verify English card in "Gao English Spelling" deck, Chinese card in "Gao Chinese" deck
 
 ### 9e. Unauthorized user (manual)
 - Set `TELEGRAM_ALLOWED_USERS` to a different user ID

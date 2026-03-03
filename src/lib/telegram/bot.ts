@@ -5,6 +5,7 @@
 import { Bot } from "grammy";
 import { getConfig } from "@/lib/settings";
 import { registerHandlers } from "./handlers";
+import { wordQueue } from "./word-queue";
 
 // Persist across HMR in dev
 const globalForBot = globalThis as unknown as {
@@ -48,6 +49,9 @@ export async function startTelegramBot(): Promise<void> {
   }
 
   const bot = new Bot(token);
+
+  // Initialize word queue with bot API
+  wordQueue.init(bot.api);
 
   // Access control middleware
   bot.use(async (ctx, next) => {

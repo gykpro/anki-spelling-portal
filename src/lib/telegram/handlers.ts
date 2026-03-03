@@ -5,11 +5,12 @@ import type { Bot } from "grammy";
 import { detectIntent } from "./intent";
 import { createProgressReporter } from "./progress";
 import {
-  runFullPipeline,
   runFullPipelineFromExtraction,
   extractFromImages,
 } from "@/lib/enrichment-pipeline";
 import { ankiConnect } from "@/lib/anki-connect";
+import { writeQueue } from "@/lib/write-queue";
+import { wordQueue, type QueueEntry } from "./word-queue";
 
 function formatResult(result: {
   created: number;
@@ -58,7 +59,16 @@ export function registerHandlers(bot: Bot): void {
     await ctx.reply(USAGE_TEXT, { parse_mode: "HTML" });
   });
 
-  // Handle text messages
+  // Handle "Start Now" inline button
+  bot.callbackQuery("word_queue_start", async (ctx) => {
+    await ctx.answerCallbackQuery();
+    const chatId = ctx.chat?.id;
+    if (chatId) {
+      await wordQueue.drain(chatId);
+    }
+  });
+
+  // Handle text messages — push to word queue instead of immediate pipeline
   bot.on("message:text", async (ctx) => {
     const text = ctx.message.text;
     const intent = detectIntent(text);
@@ -75,23 +85,13 @@ export function registerHandlers(bot: Bot): void {
       return;
     }
 
-    const progress = createProgressReporter(ctx);
-    await progress.update(
-      `Adding ${intent.words.length} word(s) → ${intent.lang.label} (${intent.lang.deck})...`
-    );
+    // Convert intent words to queue entries
+    const entries: QueueEntry[] = intent.words.map((word) => ({
+      word,
+      lang: intent.lang,
+    }));
 
-    try {
-      const result = await runFullPipeline(intent.words, progress, intent.lang);
-      await progress.send(formatResult({
-        ...result,
-        lang: intent.lang.label,
-        deck: intent.lang.deck,
-      }));
-    } catch (err) {
-      await ctx.reply(
-        `Error: ${err instanceof Error ? err.message : String(err)}`
-      );
-    }
+    await wordQueue.add(ctx.chat.id, entries);
   });
 
   // Handle photo messages (worksheet extraction)
@@ -100,6 +100,11 @@ export function registerHandlers(bot: Bot): void {
     if (!ankiOk) {
       await ctx.reply("Anki is not reachable. Make sure Anki is running with AnkiConnect.");
       return;
+    }
+
+    // Drain pending words first before processing photo
+    if (wordQueue.size(ctx.chat.id) > 0) {
+      await wordQueue.drain(ctx.chat.id);
     }
 
     const progress = createProgressReporter(ctx);
@@ -149,11 +154,17 @@ export function registerHandlers(bot: Bot): void {
         (sum, p) => sum + p.sentences.length,
         0
       );
-      await progress.update(
-        `Extracted ${totalWords} words from ${pages.length} page(s). Processing...`
-      );
 
-      const result = await runFullPipelineFromExtraction(pages, progress);
+      if (writeQueue.pending > 0) {
+        await progress.update(`Queued (position ${writeQueue.pending})...`);
+      }
+
+      const result = await writeQueue.enqueue(async () => {
+        await progress.update(
+          `Extracted ${totalWords} words from ${pages.length} page(s). Processing...`
+        );
+        return runFullPipelineFromExtraction(pages, progress);
+      });
       await progress.send(formatResult(result));
     } catch (err) {
       await ctx.reply(
@@ -179,6 +190,11 @@ export function registerHandlers(bot: Bot): void {
     if (!ankiOk) {
       await ctx.reply("Anki is not reachable. Make sure Anki is running with AnkiConnect.");
       return;
+    }
+
+    // Drain pending words first before processing document
+    if (wordQueue.size(ctx.chat.id) > 0) {
+      await wordQueue.drain(ctx.chat.id);
     }
 
     const progress = createProgressReporter(ctx);
@@ -222,11 +238,17 @@ export function registerHandlers(bot: Bot): void {
         (sum, p) => sum + p.sentences.length,
         0
       );
-      await progress.update(
-        `Extracted ${totalWords} words from ${pages.length} page(s). Processing...`
-      );
 
-      const result = await runFullPipelineFromExtraction(pages, progress);
+      if (writeQueue.pending > 0) {
+        await progress.update(`Queued (position ${writeQueue.pending})...`);
+      }
+
+      const result = await writeQueue.enqueue(async () => {
+        await progress.update(
+          `Extracted ${totalWords} words from ${pages.length} page(s). Processing...`
+        );
+        return runFullPipelineFromExtraction(pages, progress);
+      });
       await progress.send(formatResult(result));
     } catch (err) {
       await ctx.reply(
