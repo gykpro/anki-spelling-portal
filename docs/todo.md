@@ -15,6 +15,8 @@
 ## Pending
 
 ## Recently Completed
+- [x] **Queue Edit — Remove Words from Pending Queue** — "Edit Queue" button alongside "Start Now" lets users view and remove individual words before batch processing. Handles re-indexing, empty queue cleanup (timer cancellation + status message deletion), and "Done" dismissal.
+- [x] **Telegram Word Queue** — Words sent to the Telegram bot accumulate in a per-chat queue and batch-process after 60s or "Start Now" button click. Shares one enrichment round and distribution cycle per batch. Mixed languages processed as separate groups.
 - [x] **Chinese Skill Script Support** — Skill scripts (`skill/scripts/`) now auto-detect Chinese words (CJK range) and use the correct deck/model/fields. All scripts accept `--lang` flag. Chinese enrichment includes sentencePinyin and stroke order phases. SKILL.md updated.
 - [x] **Chunked Text Enrichment** — batchEnrichText() now chunks words into groups of 15 to prevent 120s CLI timeout on large batches (40+ words). Both pipeline functions show per-chunk progress. MAX_PIPELINE_WORDS=50 cap (post-dedup) prevents unbounded processing.
 - [x] **Deck-Based Browse Navigation** — Replaced deck toggle buttons on Browse page with always-visible deck sub-items under Browse in the sidebar nav. Each deck shows card count. Browse page reads `?deck=` from URL.
