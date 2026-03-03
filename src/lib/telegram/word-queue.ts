@@ -35,6 +35,17 @@ class WordQueue {
     this.api = api;
   }
 
+  private buildStatusKeyboard() {
+    return {
+      inline_keyboard: [
+        [
+          { text: "Start Now", callback_data: "word_queue_start" },
+          { text: "Edit Queue", callback_data: "word_queue_edit" },
+        ],
+      ],
+    };
+  }
+
   private getOrCreate(chatId: number): ChatQueue {
     let q = this.queues.get(chatId);
     if (!q) {
@@ -76,11 +87,7 @@ class WordQueue {
           `${q.entries.length} word(s) queued. Waiting 1 min for more...`,
           {
             parse_mode: "HTML",
-            reply_markup: {
-              inline_keyboard: [
-                [{ text: "Start Now", callback_data: "word_queue_start" }],
-              ],
-            },
+            reply_markup: this.buildStatusKeyboard(),
           }
         );
         q.statusMessageId = msg.message_id;
@@ -102,11 +109,7 @@ class WordQueue {
             q.statusMessageId,
             `${q.entries.length} word(s) queued. Waiting for more...`,
             {
-              reply_markup: {
-                inline_keyboard: [
-                  [{ text: "Start Now", callback_data: "word_queue_start" }],
-                ],
-              },
+              reply_markup: this.buildStatusKeyboard(),
             }
           );
         } catch {
@@ -227,17 +230,65 @@ class WordQueue {
           `${q.entries.length} word(s) queued. Waiting 1 min for more...`,
           {
             parse_mode: "HTML",
-            reply_markup: {
-              inline_keyboard: [
-                [{ text: "Start Now", callback_data: "word_queue_start" }],
-              ],
-            },
+            reply_markup: this.buildStatusKeyboard(),
           }
         );
         q.statusMessageId = msg.message_id;
       } catch {
         // ignore
       }
+    }
+  }
+
+  /** Returns a snapshot of current pending entries. */
+  getEntries(chatId: number): QueueEntry[] {
+    const q = this.queues.get(chatId);
+    if (!q) return [];
+    return [...q.entries];
+  }
+
+  /** Remove entry at given index. Returns removed entry or null if invalid. */
+  remove(chatId: number, index: number): QueueEntry | null {
+    if (!this.api) return null;
+    const q = this.queues.get(chatId);
+    if (!q || q.draining || index < 0 || index >= q.entries.length) return null;
+
+    const [removed] = q.entries.splice(index, 1);
+
+    if (q.entries.length === 0) {
+      // Queue empty — cancel timer, delete status message
+      if (q.timer) {
+        clearTimeout(q.timer);
+        q.timer = null;
+      }
+      if (q.statusMessageId) {
+        this.api
+          .deleteMessage(chatId, q.statusMessageId)
+          .catch(() => {});
+        q.statusMessageId = null;
+      }
+    }
+
+    return removed;
+  }
+
+  /** Update the status message with current count and keyboard. */
+  async updateStatusMessage(chatId: number): Promise<void> {
+    if (!this.api) return;
+    const q = this.queues.get(chatId);
+    if (!q || !q.statusMessageId) return;
+
+    if (q.entries.length === 0) return;
+
+    try {
+      await this.api.editMessageText(
+        chatId,
+        q.statusMessageId,
+        `${q.entries.length} word(s) queued. Waiting for more...`,
+        { reply_markup: this.buildStatusKeyboard() }
+      );
+    } catch {
+      // Edit may fail if text unchanged
     }
   }
 }

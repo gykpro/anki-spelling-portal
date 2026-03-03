@@ -569,6 +569,36 @@ After all tests:
 - Verify English and Chinese processed as separate groups
 - Verify English card in "Gao English Spelling" deck, Chinese card in "Gao Chinese" deck
 
+### 9c7. Word queue — edit queue to remove words (manual)
+- Send `__test_tg_edit1` to the bot
+- Verify "1 word(s) queued" with [Start Now] and [Edit Queue] buttons
+- Send `__test_tg_edit2`
+- Verify "Words added (2 queued)" and status updates to "2 word(s) queued" with both buttons
+- Click [Edit Queue]
+- Verify bot sends new message: "Queued words — tap to remove:" with buttons:
+  - `❌ __test_tg_edit1 (English)`
+  - `❌ __test_tg_edit2 (English)`
+  - `Done`
+- Click `❌ __test_tg_edit2` to remove it
+- Verify callback answer "Removed: __test_tg_edit2"
+- Verify edit message updates to show only `❌ __test_tg_edit1 (English)` and `Done`
+- Verify status message updates to "1 word(s) queued..."
+- Click `Done`
+- Verify edit message changes to "Queue edited." with no keyboard
+- Send `__test_tg_edit3`
+- Verify "Words added (2 queued)"
+- Click [Start Now] — verify both `__test_tg_edit1` and `__test_tg_edit3` processed (not edit2)
+
+### 9c8. Word queue — edit queue remove all words (manual)
+- Send `__test_tg_rmall` to the bot
+- Verify "1 word(s) queued" with [Start Now] [Edit Queue]
+- Click [Edit Queue]
+- Verify word list with `❌ __test_tg_rmall (English)` and `Done`
+- Click `❌ __test_tg_rmall`
+- Verify message changes to "Queue is empty." with no keyboard
+- Verify status message is deleted (timer cancelled)
+- Wait 60+ seconds — verify no auto-drain occurs (no "Processing..." message)
+
 ### 9e. Unauthorized user (manual)
 - Set `TELEGRAM_ALLOWED_USERS` to a different user ID
 - Send a message from your account

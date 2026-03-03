@@ -68,6 +68,91 @@ export function registerHandlers(bot: Bot): void {
     }
   });
 
+  // Handle "Edit Queue" inline button
+  bot.callbackQuery("word_queue_edit", async (ctx) => {
+    const chatId = ctx.chat?.id;
+    if (!chatId) {
+      await ctx.answerCallbackQuery();
+      return;
+    }
+
+    const entries = wordQueue.getEntries(chatId);
+    if (entries.length === 0 || wordQueue.isDraining(chatId)) {
+      await ctx.answerCallbackQuery("Queue is empty or processing");
+      return;
+    }
+
+    await ctx.answerCallbackQuery();
+
+    const keyboard = entries.map((e, i) => [
+      { text: `❌ ${e.word} (${e.lang.label})`, callback_data: `word_queue_rm_${i}` },
+    ]);
+    keyboard.push([{ text: "Done", callback_data: "word_queue_edit_done" }]);
+
+    await ctx.reply("Queued words — tap to remove:", {
+      reply_markup: { inline_keyboard: keyboard },
+    });
+  });
+
+  // Handle "Done" on edit queue message
+  bot.callbackQuery("word_queue_edit_done", async (ctx) => {
+    await ctx.answerCallbackQuery();
+    try {
+      await ctx.editMessageText("Queue edited.", {
+        reply_markup: { inline_keyboard: [] },
+      });
+    } catch {
+      // ignore
+    }
+  });
+
+  // Handle word removal from queue
+  bot.callbackQuery(/^word_queue_rm_(\d+)$/, async (ctx) => {
+    const chatId = ctx.chat?.id;
+    if (!chatId) {
+      await ctx.answerCallbackQuery();
+      return;
+    }
+
+    const index = parseInt(ctx.match[1], 10);
+    const removed = wordQueue.remove(chatId, index);
+
+    if (!removed) {
+      await ctx.answerCallbackQuery("Could not remove (queue may have changed)");
+      return;
+    }
+
+    await ctx.answerCallbackQuery(`Removed: ${removed.word}`);
+
+    // Rebuild the edit message with updated entries
+    const entries = wordQueue.getEntries(chatId);
+    if (entries.length === 0) {
+      try {
+        await ctx.editMessageText("Queue is empty.", {
+          reply_markup: { inline_keyboard: [] },
+        });
+      } catch {
+        // ignore
+      }
+    } else {
+      const keyboard = entries.map((e, i) => [
+        { text: `❌ ${e.word} (${e.lang.label})`, callback_data: `word_queue_rm_${i}` },
+      ]);
+      keyboard.push([{ text: "Done", callback_data: "word_queue_edit_done" }]);
+
+      try {
+        await ctx.editMessageText("Queued words — tap to remove:", {
+          reply_markup: { inline_keyboard: keyboard },
+        });
+      } catch {
+        // ignore
+      }
+
+      // Update the status message count
+      await wordQueue.updateStatusMessage(chatId);
+    }
+  });
+
   // Handle text messages — push to word queue instead of immediate pipeline
   bot.on("message:text", async (ctx) => {
     const text = ctx.message.text;

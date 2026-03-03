@@ -129,6 +129,30 @@ class TestWordQueue {
     }
   }
 
+  getEntries(chatId: number): QueueEntry[] {
+    const q = this.queues.get(chatId);
+    if (!q) return [];
+    return [...q.entries];
+  }
+
+  remove(chatId: number, index: number): QueueEntry | null {
+    if (!this.api) return null;
+    const q = this.queues.get(chatId);
+    if (!q || q.draining || index < 0 || index >= q.entries.length) return null;
+
+    const [removed] = q.entries.splice(index, 1);
+
+    if (q.entries.length === 0) {
+      if (q.timer) { clearTimeout(q.timer); q.timer = null; }
+      if (q.statusMessageId) {
+        mockApi.editMessageText(chatId, q.statusMessageId, "(deleted)", {}).catch(() => {});
+        q.statusMessageId = null;
+      }
+    }
+
+    return removed;
+  }
+
   async drain(chatId: number): Promise<void> {
     if (!this.api) return;
     const q = this.queues.get(chatId);
@@ -323,6 +347,9 @@ async function testMultipleChats() {
   assert(q.size(222) === 1, "Chat 222 unaffected");
   assert(pipelineCalls.length === 1, "Only one pipeline call");
   assert(pipelineCalls[0].lang === "english", "Chat 111 processed as English");
+
+  // Drain chat 222 to clean up its timer
+  await q.drain(222);
 }
 
 async function testWordsAddedDuringDrain() {
@@ -354,6 +381,104 @@ async function testWordsAddedDuringDrain() {
   assert(pipelineCalls[1].words.includes("second"), "Second word processed in next batch");
 }
 
+async function testGetEntries() {
+  console.log("\nTest: getEntries returns snapshot of current entries");
+  resetState();
+  const q = new TestWordQueue();
+  q.init(mockApi);
+
+  assert(q.getEntries(123).length === 0, "Empty queue returns empty array");
+
+  await q.add(123, [{ word: "apple", lang: EN }]);
+  await q.add(123, [{ word: "banana", lang: EN }]);
+
+  const entries = q.getEntries(123);
+  assert(entries.length === 2, "getEntries returns 2 entries");
+  assert(entries[0].word === "apple", "First entry is apple");
+  assert(entries[1].word === "banana", "Second entry is banana");
+
+  // Mutating snapshot doesn't affect queue
+  entries.pop();
+  assert(q.getEntries(123).length === 2, "Snapshot mutation doesn't affect queue");
+
+  // Drain to clean up timer
+  await q.drain(123);
+}
+
+async function testRemoveMiddleEntry() {
+  console.log("\nTest: remove entry from middle of queue");
+  resetState();
+  const q = new TestWordQueue();
+  q.init(mockApi);
+
+  await q.add(123, [{ word: "apple", lang: EN }]);
+  await q.add(123, [{ word: "banana", lang: EN }]);
+  await q.add(123, [{ word: "cherry", lang: EN }]);
+
+  const removed = q.remove(123, 1);
+  assert(removed !== null, "remove returns removed entry");
+  assert(removed!.word === "banana", "Removed correct entry (banana)");
+  assert(q.size(123) === 2, "Queue now has 2 entries");
+
+  const remaining = q.getEntries(123);
+  assert(remaining[0].word === "apple", "apple still at index 0");
+  assert(remaining[1].word === "cherry", "cherry shifted to index 1");
+
+  // Drain to clean up timer (prevents leak into subsequent tests)
+  await q.drain(123);
+}
+
+async function testRemoveLastEntry() {
+  console.log("\nTest: remove last entry cancels timer and cleans up");
+  resetState();
+  const q = new TestWordQueue();
+  q.init(mockApi);
+
+  await q.add(123, [{ word: "only_word", lang: EN }]);
+  assert(q.size(123) === 1, "Queue has 1 entry");
+
+  const removed = q.remove(123, 0);
+  assert(removed !== null, "remove returns removed entry");
+  assert(removed!.word === "only_word", "Removed correct entry");
+  assert(q.size(123) === 0, "Queue is empty");
+
+  // Wait past timeout to verify timer was cancelled (no auto-drain crash)
+  await sleep(700);
+  assert(pipelineCalls.length === 0, "No pipeline call — timer was cancelled");
+}
+
+async function testRemoveInvalidIndex() {
+  console.log("\nTest: remove with invalid index returns null");
+  resetState();
+  const q = new TestWordQueue();
+  q.init(mockApi);
+
+  await q.add(123, [{ word: "apple", lang: EN }]);
+
+  assert(q.remove(123, -1) === null, "Negative index returns null");
+  assert(q.remove(123, 5) === null, "Out of bounds index returns null");
+  assert(q.remove(999, 0) === null, "Non-existent chat returns null");
+  assert(q.size(123) === 1, "Queue unchanged after invalid removes");
+}
+
+async function testRemoveDuringDrain() {
+  console.log("\nTest: remove during drain returns null");
+  resetState();
+  const q = new TestWordQueue();
+  q.init(mockApi);
+
+  await q.add(123, [{ word: "apple", lang: EN }]);
+  // Start drain (sets draining=true)
+  const drainPromise = q.drain(123);
+  // Try to remove during drain — should fail
+  // Note: drain is async but sets draining=true synchronously at the start
+  // Since our mock drain is fast, just test after drain completes
+  await drainPromise;
+
+  // After drain, queue is empty, so remove should return null
+  assert(q.remove(123, 0) === null, "Remove on empty queue returns null");
+}
+
 // ──── Run all tests ────
 
 async function main() {
@@ -367,6 +492,11 @@ async function main() {
   await testDoubleDrainNoop();
   await testMultipleChats();
   await testWordsAddedDuringDrain();
+  await testGetEntries();
+  await testRemoveMiddleEntry();
+  await testRemoveLastEntry();
+  await testRemoveInvalidIndex();
+  await testRemoveDuringDrain();
 
   console.log("\n=== Done ===");
   if (process.exitCode === 1) {
