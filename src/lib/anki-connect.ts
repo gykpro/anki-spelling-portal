@@ -118,7 +118,7 @@ export const ankiConnect = {
           duplicateScope: "deck",
         },
       })),
-    });
+    }, 120000);
   },
 
   /** Update fields of an existing note */
@@ -133,12 +133,12 @@ export const ankiConnect = {
 
   /** Search for notes using Anki query syntax */
   async findNotes(query: string): Promise<number[]> {
-    return invoke<number[]>("findNotes", { query });
+    return invoke<number[]>("findNotes", { query }, 60000);
   },
 
   /** Get full note info for given IDs */
   async notesInfo(notes: number[]): Promise<AnkiNote[]> {
-    return invoke<AnkiNote[]>("notesInfo", { notes });
+    return invoke<AnkiNote[]>("notesInfo", { notes }, 60000);
   },
 
   /** Store a media file in Anki */
@@ -146,7 +146,7 @@ export const ankiConnect = {
     filename: string,
     data: string // base64-encoded
   ): Promise<string> {
-    return invoke<string>("storeMediaFile", { filename, data });
+    return invoke<string>("storeMediaFile", { filename, data }, 120000);
   },
 
   /** Delete notes by ID */
@@ -222,13 +222,13 @@ export const ankiConnect = {
 
   /** Request a sync */
   async sync(): Promise<void> {
-    await invoke("sync");
+    await invoke("sync", undefined, 120000);
   },
 
   /** Sync before write — non-blocking, logs warning on failure */
   async syncBeforeWrite(): Promise<void> {
     try {
-      await invoke("sync");
+      await invoke("sync", undefined, 120000);
     } catch (err) {
       console.warn("[AnkiConnect] Sync before write failed (continuing anyway):", err);
     }
