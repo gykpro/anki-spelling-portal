@@ -239,7 +239,7 @@ Requirements:
 
 // ─── Constants ───
 
-const ENRICH_CHUNK_SIZE = 15; // Max words per AI call (fits comfortably in 120s timeout)
+const ENRICH_CHUNK_SIZE = 10; // Max words per AI call (reduced from 15 to avoid CLI timeouts)
 const MAX_PIPELINE_WORDS = 50; // Max new words per pipeline run (post-dedup)
 
 // ─── Batch text enrichment ───

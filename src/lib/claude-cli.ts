@@ -17,7 +17,7 @@ export function runClaude(prompt: string, options?: {
   maxBudget?: number;
   allowedTools?: string[];
 }): Promise<string> {
-  const { timeout = 120_000, maxBudget = 5, allowedTools } = options || {};
+  const { timeout = 150_000, maxBudget = 5, allowedTools } = options || {};
 
   return new Promise((resolve, reject) => {
     const args = [
