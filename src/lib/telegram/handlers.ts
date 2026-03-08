@@ -7,6 +7,7 @@ import { createProgressReporter } from "./progress";
 import {
   runFullPipelineFromExtraction,
   extractFromImages,
+  extractWordsFromSentence,
 } from "@/lib/enrichment-pipeline";
 import { ankiConnect } from "@/lib/anki-connect";
 import { writeQueue } from "@/lib/write-queue";
@@ -212,6 +213,38 @@ export function registerHandlers(bot: Bot): void {
 
     if (intent.type === "unknown") {
       await ctx.reply(t(uid, "usage_text"), { parse_mode: "HTML" });
+      return;
+    }
+
+    if (intent.type === "sentence") {
+      const ankiOk = await ankiConnect.ping();
+      if (!ankiOk) {
+        await ctx.reply(t(uid, "anki_not_reachable"));
+        return;
+      }
+
+      await ctx.reply(t(uid, "extracting_words_from_sentence"));
+
+      try {
+        const extractedWords = await extractWordsFromSentence(intent.sentence, intent.lang);
+        if (extractedWords.length === 0) {
+          await ctx.reply(t(uid, "no_words_extracted"));
+          return;
+        }
+
+        // Add extracted words to queue with source sentence
+        const entries: QueueEntry[] = extractedWords.map((word) => ({
+          word,
+          lang: intent.lang,
+          sourceSentence: intent.sentence,
+        }));
+
+        await wordQueue.add(ctx.chat.id, entries);
+      } catch (err) {
+        await ctx.reply(
+          t(uid, "error_message", err instanceof Error ? err.message : String(err))
+        );
+      }
       return;
     }
 

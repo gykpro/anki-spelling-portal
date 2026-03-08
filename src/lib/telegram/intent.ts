@@ -3,10 +3,11 @@
  * Pure function — no side effects.
  */
 
-import { detectLanguage, type LanguageConfig } from "@/lib/languages";
+import { detectLanguage, isSentenceInput, type LanguageConfig } from "@/lib/languages";
 
 export type Intent =
   | { type: "word_list"; words: string[]; lang: LanguageConfig }
+  | { type: "sentence"; sentence: string; lang: LanguageConfig }
   | { type: "unknown" };
 
 const CJK_RE = /[\u4e00-\u9fff]/;
@@ -30,6 +31,11 @@ export function detectIntent(text: string): Intent {
 
   if (parts.length > 1) {
     return { type: "word_list", words: parts, lang };
+  }
+
+  // Check if single input is a sentence
+  if (parts.length === 1 && isSentenceInput(trimmed)) {
+    return { type: "sentence", sentence: trimmed, lang };
   }
 
   // Single entry: for English, >5 words is probably a question/message.

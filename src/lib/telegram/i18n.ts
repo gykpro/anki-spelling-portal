@@ -47,7 +47,9 @@ export type MsgKey =
   | "lang_choose"
   | "lang_updated"
   | "btn_lang_english"
-  | "btn_lang_chinese";
+  | "btn_lang_chinese"
+  | "extracting_words_from_sentence"
+  | "no_words_extracted";
 
 const translations: Record<Lang, Record<MsgKey, string>> = {
   english: {
@@ -99,6 +101,9 @@ const translations: Record<Lang, Record<MsgKey, string>> = {
     lang_updated: "Language set to {0}.",
     btn_lang_english: "English",
     btn_lang_chinese: "中文",
+    extracting_words_from_sentence: "Analyzing sentence for key words...",
+    no_words_extracted:
+      "Could not extract any vocabulary words from that sentence.",
   },
   chinese: {
     not_authorized: "您无权使用此机器人。",
@@ -148,6 +153,8 @@ const translations: Record<Lang, Record<MsgKey, string>> = {
     lang_updated: "语言已设置为{0}。",
     btn_lang_english: "English",
     btn_lang_chinese: "中文",
+    extracting_words_from_sentence: "正在分析句子中的关键词...",
+    no_words_extracted: "无法从该句子中提取词汇。",
   },
 };
 
