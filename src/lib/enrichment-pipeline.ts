@@ -312,6 +312,37 @@ export function extractJsonArray(text: string): Record<string, unknown>[] {
   }
 }
 
+/** Extract 1-3 key vocabulary words from a sentence via AI.
+ *  Returns an array of word strings suitable for a Primary 4 student to practice. */
+export async function extractWordsFromSentence(
+  sentence: string,
+  lang: LanguageConfig
+): Promise<string[]> {
+  const langLabel = lang.id === "chinese" ? "Chinese" : "English";
+  const prompt = `You are a ${langLabel} vocabulary teacher for Primary 4 students (~10 years old).
+
+Given this sentence:
+"${sentence}"
+
+Extract 1-3 key vocabulary words/phrases from the sentence that a Primary 4 student should practice.
+- Skip common/basic words the student would already know (e.g. common pronouns, articles, simple verbs like "is/are/have", simple nouns like "car/house")
+- Focus on words that are age-appropriate but challenging enough to be worth studying
+- Return ONLY a JSON array of strings, e.g. ["word1", "word2"]
+- No markdown, no code fences, no explanation`;
+
+  const rawText = await runAI(prompt);
+  const parsed = extractJsonArray(rawText);
+
+  // Handle both string[] and object[] responses from AI
+  return parsed.map((item) => {
+    if (typeof item === "string") return item;
+    // If AI returned objects, try common key names
+    const val =
+      item.word ?? item.Word ?? item.text ?? item.value ?? Object.values(item)[0];
+    return String(val ?? "");
+  }).filter((w) => w.length > 0);
+}
+
 export function buildBatchPrompt(
   cards: { word: string; sentence?: string }[],
   fields: TextEnrichField[],
