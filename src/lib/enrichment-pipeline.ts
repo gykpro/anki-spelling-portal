@@ -329,16 +329,36 @@ export async function checkDuplicates(
   lang?: LanguageConfig
 ): Promise<Set<string>> {
   const deck = lang?.deck ?? getLanguageById("english").deck;
-  const existing = new Set<string>();
-  for (const word of words) {
-    const noteIds = await ankiConnect.findNotes(
-      `deck:"${deck}" Word:"${word}"`
-    );
-    if (noteIds.length > 0) {
-      existing.add(word.toLowerCase());
+
+  // Fetch all Word field values from the deck in one batch for reliable matching
+  const allNoteIds = await ankiConnect.findNotes(`deck:"${deck}"`);
+  const existingWords = new Set<string>();
+
+  if (allNoteIds.length > 0) {
+    // Fetch in chunks of 100 to avoid oversized requests
+    for (let i = 0; i < allNoteIds.length; i += 100) {
+      const chunk = allNoteIds.slice(i, i + 100);
+      const notes = await ankiConnect.notesInfo(chunk);
+      for (const note of notes) {
+        const word = note.fields?.Word?.value?.trim();
+        if (word) {
+          existingWords.add(word.toLowerCase());
+        }
+      }
     }
   }
-  return existing;
+
+  // Match input words against existing (case-insensitive, trimmed)
+  const dupes = new Set<string>();
+  for (const word of words) {
+    const normalized = word.trim().toLowerCase();
+    if (existingWords.has(normalized)) {
+      dupes.add(normalized);
+    }
+  }
+
+  console.log(`[Duplicates] Deck "${deck}": ${allNoteIds.length} existing notes, ${dupes.size}/${words.length} duplicates found`);
+  return dupes;
 }
 
 /** Create notes in Anki for given words. Returns array of created note IDs. */
