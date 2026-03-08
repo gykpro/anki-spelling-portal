@@ -15,6 +15,7 @@
 ## Pending
 
 ## Recently Completed
+- [x] **Sentence-to-Words Extraction** — Detect sentence input (Chinese >5 chars, English >3 words, or punctuation), extract 1-3 key vocabulary words via AI, create cards with original sentence pre-filled as Main Sentence. Works in both Telegram bot and Portal Quick Add. Enrichment skips sentence generation for cards with pre-filled sentences.
 - [x] **Word Detail Drawer** — Click any word on Browse page to open a slide-out drawer showing all card fields grouped into sections (Core, Phonetics, Extended, Media). Shows field fill status with checkmarks, stroke order partial completeness indicator, and quick Enrich link. Closes via X, Escape, or click-outside.
 - [x] **Fix: Save All Progress + Navigation Guard** — Save All now shows a prominent progress banner with progress bar and card counter. Navigation guard (`beforeunload`) prevents accidental page leave during save or batch enrichment. Banner auto-dismisses after 3 seconds on completion.
 - [x] **Fix: Stroke Order Completeness Filter** — "No Stroke Order" filter on Browse now detects partial stroke order (fewer `<img>` tags than CJK characters in the word). Also used by the "Complete" filter and dashboard stats. `isStrokeOrderComplete()` helper in `card-completeness.ts`.
