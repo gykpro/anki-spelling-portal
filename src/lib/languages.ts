@@ -88,3 +88,31 @@ export function getLanguageById(
 ): LanguageConfig {
   return id === "chinese" ? CHINESE : ENGLISH;
 }
+
+/**
+ * Detect whether user input is a full sentence (vs a word/phrase).
+ *
+ * Rules:
+ * - Contains sentence-ending punctuation (。！？.!?) → sentence
+ * - Chinese (contains CJK chars): more than 5 characters → sentence
+ * - English (no CJK chars): more than 3 words → sentence
+ * - Otherwise → not a sentence
+ */
+export function isSentenceInput(text: string): boolean {
+  const trimmed = text.trim();
+  if (!trimmed) return false;
+
+  // Sentence-ending punctuation → sentence
+  if (/[。！？.!?]/.test(trimmed)) return true;
+
+  const hasCJK = /[\u4e00-\u9fff]/.test(trimmed);
+
+  if (hasCJK) {
+    // Chinese: more than 5 characters → sentence
+    return trimmed.length > 5;
+  } else {
+    // English: more than 3 words → sentence
+    const words = trimmed.split(/\s+/).filter(Boolean);
+    return words.length > 3;
+  }
+}
