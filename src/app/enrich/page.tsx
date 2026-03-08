@@ -697,7 +697,7 @@ function EnrichContent() {
   const enrichAllEmpty = async () => {
     // Collect cards with any empty text fields
     const textFieldKeys: EnrichField[] = [
-      "sentence", "definition", "phonetic", "synonyms", "extra_info",
+      "sentence", "definition", "phonetic", "synonyms", "extra_info", "sentencePinyin",
     ];
 
     const cardsToEnrich: { noteId: number; word: string; sentence?: string; emptyFields: EnrichField[] }[] = [];
@@ -1317,7 +1317,7 @@ function EnrichContent() {
   // Count cards with empty text fields
   const cardsWithEmptyText = notes.filter((note) => {
     const info = getEnrichableFields(note);
-    return ["sentence", "definition", "phonetic", "synonyms", "extra_info"].some(
+    return ["sentence", "definition", "phonetic", "synonyms", "extra_info", "sentencePinyin"].some(
       (f) => info.fields[f as EnrichField]?.available && !info.fields[f as EnrichField]?.filled
     );
   }).length;
