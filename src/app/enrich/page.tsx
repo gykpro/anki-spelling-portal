@@ -549,7 +549,7 @@ function EnrichContent() {
     }
   };
 
-  const save = async (noteId: number) => {
+  const save = async (noteId: number, skipRefresh = false) => {
     const state = noteStates[noteId];
     const note = notes.find((n) => n.noteId === noteId);
     if (!state?.results || !note) return;
@@ -681,8 +681,8 @@ function EnrichContent() {
         distribute([noteId], distTargets, mediaFiles.length > 0 ? mediaFiles : undefined);
       }
 
-      // Refresh the note data
-      fetchNotes();
+      // Refresh the note data (skip when called from batch save)
+      if (!skipRefresh) fetchNotes();
     } catch (err) {
       setNoteStates((prev) => ({
         ...prev,
@@ -824,7 +824,7 @@ function EnrichContent() {
 
     let savedCount = 0;
     for (const noteId of unsavedNoteIds) {
-      await save(noteId);
+      await save(noteId, true);
       savedCount++;
       setSaveAllProgress({ current: savedCount, total: unsavedNoteIds.length });
       setBatchProgress(`Saved ${savedCount}/${unsavedNoteIds.length}...`);
@@ -833,6 +833,7 @@ function EnrichContent() {
     setBatchProgress(`All ${savedCount} cards saved`);
     setSavingAll(false);
     setSaveAllDone(true);
+    fetchNotes();
 
     // Auto-dismiss the success banner after 3 seconds
     setTimeout(() => {
