@@ -14,6 +14,7 @@ import {
 import { useAnkiConnection } from "@/hooks/useAnkiConnection";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
+import { getAllLanguages } from "@/lib/languages";
 
 interface DeckStats {
   total: number;
@@ -21,14 +22,40 @@ interface DeckStats {
   missingAudio: number;
   missingImage: number;
   missingSentence: number;
+  missingPhonetic: number;
+  missingSentenceAudio: number;
+  missingStrokeOrder: number;
+  missingSynonyms: number;
+  missingExtraInfo: number;
+  missingSentencePinyin: number;
   complete: number;
   needsAttention: number;
   needsAttentionNoteIds: number[];
 }
 
+interface AllStats extends DeckStats {
+  byLanguage: Record<string, DeckStats>;
+}
+
+// Chip config: which stat fields to show, with optional language restriction
+const STAT_CHIPS: {
+  key: keyof DeckStats;
+  label: string;
+  filter: string;
+  chineseOnly?: boolean;
+}[] = [
+  { key: "missingDefinition", label: "No Definition", filter: "missing_definition" },
+  { key: "missingAudio", label: "No Audio", filter: "missing_audio" },
+  { key: "missingImage", label: "No Image", filter: "missing_image" },
+  { key: "missingSentence", label: "No Sentence", filter: "missing_sentence" },
+  { key: "missingPhonetic", label: "No Phonetic", filter: "missing_phonetic" },
+  { key: "missingSentenceAudio", label: "No Sentence Audio", filter: "missing_sentence_audio" },
+  { key: "missingStrokeOrder", label: "No Stroke Order", filter: "missing_stroke_order", chineseOnly: true },
+];
+
 export default function DashboardPage() {
   const { status, loading, refresh } = useAnkiConnection();
-  const [stats, setStats] = useState<DeckStats | null>(null);
+  const [stats, setStats] = useState<AllStats | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
   const [statsError, setStatsError] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
@@ -68,6 +95,8 @@ export default function DashboardPage() {
     }
     fetchStats();
   }, []);
+
+  const languages = getAllLanguages();
 
   return (
     <div className="space-y-8">
@@ -159,7 +188,7 @@ export default function DashboardPage() {
         ) : null}
       </div>
 
-      {/* Needs Attention */}
+      {/* Card Completeness — per language */}
       <div className="rounded-lg border border-border p-5">
         <h3 className="text-sm font-semibold">Card Completeness</h3>
         {statsLoading ? (
@@ -174,53 +203,32 @@ export default function DashboardPage() {
             <AlertTriangle className="h-4 w-4" />
             <span>{statsError}</span>
           </div>
-        ) : stats && stats.needsAttention > 0 ? (
-          <div className="mt-4 space-y-4">
-            <div className="flex items-center gap-2 text-sm">
-              <AlertTriangle className="h-4 w-4 text-amber-500" />
-              <span>
-                <span className="font-semibold">{stats.needsAttention}</span> of{" "}
-                <span className="font-semibold">{stats.total}</span> cards need
-                attention
-              </span>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Link
-                href="/browse?filter=missing_definition"
-                className="inline-flex items-center rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-800 transition-colors hover:bg-amber-100 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-300 dark:hover:bg-amber-900"
-              >
-                No Definition ({stats.missingDefinition})
-              </Link>
-              <Link
-                href="/browse?filter=missing_audio"
-                className="inline-flex items-center rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-800 transition-colors hover:bg-amber-100 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-300 dark:hover:bg-amber-900"
-              >
-                No Audio ({stats.missingAudio})
-              </Link>
-              <Link
-                href="/browse?filter=missing_image"
-                className="inline-flex items-center rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-800 transition-colors hover:bg-amber-100 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-300 dark:hover:bg-amber-900"
-              >
-                No Image ({stats.missingImage})
-              </Link>
-              <span className="inline-flex items-center rounded-full border border-green-300 bg-green-50 px-3 py-1 text-xs font-medium text-green-800 dark:border-green-700 dark:bg-green-950 dark:text-green-300">
-                Complete ({stats.complete})
-              </span>
-            </div>
-            <Link
-              href={`/enrich?noteIds=${stats.needsAttentionNoteIds.join(",")}`}
-              className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-            >
-              <Sparkles className="h-4 w-4" />
-              Enrich {stats.needsAttention} cards
-            </Link>
+        ) : stats?.byLanguage ? (
+          <div className="mt-4 space-y-6">
+            {languages.map((lang) => {
+              const langStats = stats.byLanguage[lang.id] as DeckStats | undefined;
+              if (!langStats || langStats.total === 0) return null;
+              const isChinese = lang.id === "chinese";
+              return (
+                <DeckCompletenessSection
+                  key={lang.id}
+                  label={lang.label}
+                  deck={lang.deck}
+                  stats={langStats}
+                  isChinese={isChinese}
+                />
+              );
+            })}
           </div>
         ) : stats ? (
-          <div className="mt-4 flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
-            <CheckCircle2 className="h-4 w-4" />
-            <span>
-              All {stats.total} cards are complete
-            </span>
+          // Fallback: flat stats (no byLanguage)
+          <div className="mt-4">
+            <DeckCompletenessSection
+              label="English"
+              deck={languages[0]?.deck || ""}
+              stats={stats}
+              isChinese={false}
+            />
           </div>
         ) : null}
       </div>
@@ -268,6 +276,74 @@ export default function DashboardPage() {
           </p>
         </Link>
       </div>
+    </div>
+  );
+}
+
+function DeckCompletenessSection({
+  label,
+  deck,
+  stats,
+  isChinese,
+}: {
+  label: string;
+  deck: string;
+  stats: DeckStats;
+  isChinese: boolean;
+}) {
+  const chips = STAT_CHIPS.filter(
+    (c) => !c.chineseOnly || isChinese
+  ).filter((c) => (stats[c.key] as number) > 0);
+
+  const hasIssues = stats.needsAttention > 0;
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2 text-sm">
+        {hasIssues ? (
+          <AlertTriangle className="h-4 w-4 text-amber-500" />
+        ) : (
+          <CheckCircle2 className="h-4 w-4 text-green-500" />
+        )}
+        <span className="font-medium">{label}</span>
+        <span className="text-muted-foreground">
+          {hasIssues ? (
+            <>
+              <span className="font-semibold text-foreground">{stats.needsAttention}</span> of{" "}
+              <span className="font-semibold text-foreground">{stats.total}</span> cards need attention
+            </>
+          ) : (
+            <>All {stats.total} cards are complete</>
+          )}
+        </span>
+      </div>
+
+      {(chips.length > 0 || stats.complete > 0) && (
+        <div className="flex flex-wrap gap-2">
+          {chips.map((c) => (
+            <Link
+              key={c.key}
+              href={`/browse?deck=${encodeURIComponent(deck)}&filter=${c.filter}`}
+              className="inline-flex items-center rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-800 transition-colors hover:bg-amber-100 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-300 dark:hover:bg-amber-900"
+            >
+              {c.label} ({stats[c.key] as number})
+            </Link>
+          ))}
+          <span className="inline-flex items-center rounded-full border border-green-300 bg-green-50 px-3 py-1 text-xs font-medium text-green-800 dark:border-green-700 dark:bg-green-950 dark:text-green-300">
+            Complete ({stats.complete})
+          </span>
+        </div>
+      )}
+
+      {hasIssues && (
+        <Link
+          href={`/enrich?noteIds=${stats.needsAttentionNoteIds.join(",")}`}
+          className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+        >
+          <Sparkles className="h-4 w-4" />
+          Enrich {stats.needsAttention} cards
+        </Link>
+      )}
     </div>
   );
 }

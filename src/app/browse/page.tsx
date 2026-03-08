@@ -1,22 +1,43 @@
 "use client";
 
-import { Suspense, useState, useEffect, useCallback, useMemo } from "react";
+import { Suspense, useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { Search, RefreshCw, Filter } from "lucide-react";
 import { NoteTable } from "@/components/browse/NoteTable";
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
 import { cn } from "@/lib/utils";
-import { getAllLanguages } from "@/lib/languages";
+import { getAllLanguages, getLanguageByDeck } from "@/lib/languages";
+import { getCardCompleteness } from "@/lib/card-completeness";
 import type { AnkiNote } from "@/types/anki";
 
-type QuickFilter = "all" | "missing_definition" | "missing_audio" | "missing_image" | "has_all";
+type QuickFilter =
+  | "all"
+  | "missing_definition"
+  | "missing_audio"
+  | "missing_image"
+  | "has_all"
+  | "missing_sentence"
+  | "missing_phonetic"
+  | "missing_sentence_audio"
+  | "missing_stroke_order";
 
-const QUICK_FILTERS: { key: QuickFilter; label: string }[] = [
-  { key: "all", label: "All" },
-  { key: "missing_definition", label: "No Definition" },
-  { key: "missing_audio", label: "No Audio" },
-  { key: "missing_image", label: "No Image" },
-  { key: "has_all", label: "Complete" },
+interface FilterDef {
+  key: QuickFilter;
+  label: string;
+  row: 1 | 2;
+  chineseOnly?: boolean;
+}
+
+const QUICK_FILTERS: FilterDef[] = [
+  { key: "all", label: "All", row: 1 },
+  { key: "missing_definition", label: "No Definition", row: 1 },
+  { key: "missing_audio", label: "No Audio", row: 1 },
+  { key: "missing_image", label: "No Image", row: 1 },
+  { key: "has_all", label: "Complete", row: 1 },
+  { key: "missing_sentence", label: "No Sentence", row: 2 },
+  { key: "missing_phonetic", label: "No Phonetic", row: 2 },
+  { key: "missing_sentence_audio", label: "No Sentence Audio", row: 2 },
+  { key: "missing_stroke_order", label: "No Stroke Order", row: 2, chineseOnly: true },
 ];
 
 const DEFAULT_DECK = getAllLanguages()[0].deck;
@@ -36,13 +57,19 @@ export default function BrowsePage() {
 function BrowseContent() {
   const searchParams = useSearchParams();
   const selectedDeck = searchParams.get("deck") || DEFAULT_DECK;
+  const isChinese = getLanguageByDeck(selectedDeck)?.id === "chinese";
 
   const [allNotes, setAllNotes] = useState<AnkiNote[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
-  const [quickFilter, setQuickFilter] = useState<QuickFilter>("all");
+  const initialFilter = searchParams.get("filter") as QuickFilter | null;
+  const [quickFilter, setQuickFilter] = useState<QuickFilter>(
+    initialFilter && QUICK_FILTERS.some((f) => f.key === initialFilter)
+      ? initialFilter
+      : "all"
+  );
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
 
@@ -88,29 +115,76 @@ function BrowseContent() {
     fetchNotes();
   }, [fetchNotes]);
 
-  // Reset state when deck changes via URL
+  // Reset state when deck changes via URL (skip initial mount)
+  const prevDeck = useRef(selectedDeck);
   useEffect(() => {
-    setSearch("");
-    setSelectedIds(new Set());
-    setQuickFilter("all");
+    if (prevDeck.current !== selectedDeck) {
+      prevDeck.current = selectedDeck;
+      setSearch("");
+      setSelectedIds(new Set());
+      setQuickFilter("all");
+    }
   }, [selectedDeck]);
 
   // Apply quick filter client-side
   const filteredNotes = useMemo(() => {
     if (quickFilter === "all") return allNotes;
     return allNotes.filter((note) => {
-      const hasDef = !!getFieldValue(note, "Definition");
-      const hasAudio = !!getFieldValue(note, "Audio");
-      const hasImage = !!getFieldValue(note, "Picture");
       switch (quickFilter) {
-        case "missing_definition": return !hasDef;
-        case "missing_audio": return !hasAudio;
-        case "missing_image": return !hasImage;
-        case "has_all": return hasDef && hasAudio && hasImage;
-        default: return true;
+        case "missing_definition":
+          return !getFieldValue(note, "Definition");
+        case "missing_audio":
+          return !getFieldValue(note, "Audio");
+        case "missing_image":
+          return !getFieldValue(note, "Picture");
+        case "missing_sentence":
+          return !getFieldValue(note, "Main Sentence");
+        case "missing_phonetic":
+          return !getFieldValue(note, "Phonetic symbol");
+        case "missing_sentence_audio": {
+          const hasSentence = !!getFieldValue(note, "Main Sentence");
+          const hasSentenceAudio = !!getFieldValue(note, "Main Sentence Audio");
+          return hasSentence && !hasSentenceAudio;
+        }
+        case "missing_stroke_order":
+          return !getFieldValue(note, "Stroke Order Anim");
+        case "has_all": {
+          const result = getCardCompleteness(note.fields, !!isChinese);
+          return result.complete;
+        }
+        default:
+          return true;
       }
     });
-  }, [allNotes, quickFilter]);
+  }, [allNotes, quickFilter, isChinese]);
+
+  // Count notes matching each filter for chip badges
+  const filterCounts = useMemo(() => {
+    const counts: Record<QuickFilter, number> = {
+      all: allNotes.length,
+      missing_definition: 0,
+      missing_audio: 0,
+      missing_image: 0,
+      missing_sentence: 0,
+      missing_phonetic: 0,
+      missing_sentence_audio: 0,
+      missing_stroke_order: 0,
+      has_all: 0,
+    };
+    for (const note of allNotes) {
+      if (!getFieldValue(note, "Definition")) counts.missing_definition++;
+      if (!getFieldValue(note, "Audio")) counts.missing_audio++;
+      if (!getFieldValue(note, "Picture")) counts.missing_image++;
+      if (!getFieldValue(note, "Main Sentence")) counts.missing_sentence++;
+      if (!getFieldValue(note, "Phonetic symbol")) counts.missing_phonetic++;
+      if (!getFieldValue(note, "Stroke Order Anim")) counts.missing_stroke_order++;
+      const hasSentence = !!getFieldValue(note, "Main Sentence");
+      if (hasSentence && !getFieldValue(note, "Main Sentence Audio")) counts.missing_sentence_audio++;
+      const result = getCardCompleteness(note.fields, !!isChinese);
+      if (result.complete) counts.has_all++;
+    }
+    return counts;
+  }, [allNotes, isChinese]);
 
   // Collect unique tags for display
   const tagCounts = useMemo(() => {
@@ -162,6 +236,12 @@ function BrowseContent() {
     }
   };
 
+  const visibleFilters = QUICK_FILTERS.filter(
+    (f) => !f.chineseOnly || isChinese
+  );
+  const row1 = visibleFilters.filter((f) => f.row === 1);
+  const row2 = visibleFilters.filter((f) => f.row === 2);
+
   return (
     <div className="space-y-4">
       <div>
@@ -201,51 +281,66 @@ function BrowseContent() {
         </button>
       </div>
 
-      {/* Quick filters + tag chips */}
-      <div className="flex flex-wrap items-center gap-2">
-        <Filter className="h-3.5 w-3.5 text-muted-foreground" />
-        {QUICK_FILTERS.map((f) => (
-          <button
-            key={f.key}
-            onClick={() => { setQuickFilter(f.key); setPage(1); }}
-            className={cn(
-              "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
-              quickFilter === f.key
-                ? "border-primary bg-primary text-primary-foreground"
-                : "border-border text-muted-foreground hover:bg-muted"
-            )}
-          >
-            {f.label}
-            {f.key !== "all" && (
-              <span className="ml-1 opacity-70">
-                ({f.key === "missing_definition"
-                  ? allNotes.filter((n) => !getFieldValue(n, "Definition")).length
-                  : f.key === "missing_audio"
-                    ? allNotes.filter((n) => !getFieldValue(n, "Audio")).length
-                    : f.key === "missing_image"
-                      ? allNotes.filter((n) => !getFieldValue(n, "Picture")).length
-                      : allNotes.filter((n) =>
-                          !!getFieldValue(n, "Definition") &&
-                          !!getFieldValue(n, "Audio") &&
-                          !!getFieldValue(n, "Picture")
-                        ).length})
-              </span>
-            )}
-          </button>
-        ))}
-        {tagCounts.length > 0 && (
-          <>
-            <span className="mx-1 text-border">|</span>
-            {tagCounts.slice(0, 8).map(([tag, count]) => (
+      {/* Quick filters — Row 1 (essential) */}
+      <div className="space-y-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Filter className="h-3.5 w-3.5 text-muted-foreground" />
+          {row1.map((f) => (
+            <button
+              key={f.key}
+              onClick={() => { setQuickFilter(f.key); setPage(1); }}
+              className={cn(
+                "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+                quickFilter === f.key
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border text-muted-foreground hover:bg-muted"
+              )}
+            >
+              {f.label}
+              {f.key !== "all" && (
+                <span className="ml-1 opacity-70">
+                  ({filterCounts[f.key]})
+                </span>
+              )}
+            </button>
+          ))}
+          {tagCounts.length > 0 && (
+            <>
+              <span className="mx-1 text-border">|</span>
+              {tagCounts.slice(0, 8).map(([tag, count]) => (
+                <button
+                  key={tag}
+                  onClick={() => handleTagClick(tag)}
+                  className="rounded-full border border-border px-2.5 py-0.5 text-xs text-muted-foreground hover:bg-muted transition-colors"
+                >
+                  {tag} <span className="opacity-60">{count}</span>
+                </button>
+              ))}
+            </>
+          )}
+        </div>
+
+        {/* Row 2 (extended filters) */}
+        {row2.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 pl-5.5">
+            {row2.map((f) => (
               <button
-                key={tag}
-                onClick={() => handleTagClick(tag)}
-                className="rounded-full border border-border px-2.5 py-0.5 text-xs text-muted-foreground hover:bg-muted transition-colors"
+                key={f.key}
+                onClick={() => { setQuickFilter(f.key); setPage(1); }}
+                className={cn(
+                  "rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition-colors",
+                  quickFilter === f.key
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border/60 text-muted-foreground/80 hover:bg-muted"
+                )}
               >
-                {tag} <span className="opacity-60">{count}</span>
+                {f.label}
+                <span className="ml-1 opacity-70">
+                  ({filterCounts[f.key]})
+                </span>
               </button>
             ))}
-          </>
+          </div>
         )}
       </div>
 

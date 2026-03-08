@@ -15,6 +15,7 @@
 ## Pending
 
 ## Recently Completed
+- [x] **Smart Completeness Filters** — Redefined "Complete" to mean ALL available fields filled (language-aware). Added granular filter chips for every enrichable field on Browse page (two-row layout: essential + extended). Dashboard shows per-language completeness sections with zero-count chips hidden. Chinese-only filters (Stroke Order, Sentence Pinyin) conditional on deck. Shared `card-completeness.ts` utility used by both stats API and browse page.
 - [x] **Per-User Language Preference for Telegram Bot** — `/lang` command lets each user choose English or Chinese for all bot replies. Persisted per Telegram user ID in `data/telegram-user-prefs.json`. All bot strings go through `t(userId, key)` i18n function.
 - [x] **Queue Edit — Remove Words from Pending Queue** — "Edit Queue" button alongside "Start Now" lets users view and remove individual words before batch processing. Handles re-indexing, empty queue cleanup (timer cancellation + status message deletion), and "Done" dismissal.
 - [x] **Telegram Word Queue** — Words sent to the Telegram bot accumulate in a per-chat queue and batch-process after 60s or "Start Now" button click. Shares one enrichment round and distribution cycle per batch. Mixed languages processed as separate groups.

@@ -62,8 +62,11 @@ Before running tests, configure all API keys via the **Settings page** (`/settin
 ### 1d. Needs Attention — stats display
 - Navigate to `/`
 - Verify "Card Completeness" section appears between System Status and Quick Actions
-- Verify it shows "X of Y cards need attention" (or "All N cards are complete" if none missing)
-- Verify stat chips show: "No Definition (N)", "No Audio (N)", "No Image (N)", "Complete (N)"
+- Verify per-language sections: English and Chinese (only shown when deck has cards)
+- Verify each section shows "X of Y cards need attention" (or "All N cards are complete" if none missing)
+- Verify stat chips show for non-zero counts: "No Definition (N)", "No Audio (N)", "No Image (N)", "No Sentence (N)", "No Phonetic (N)", "No Sentence Audio (N)", "Complete (N)"
+- Verify "No Stroke Order" chip only appears in the Chinese section
+- Verify chips with count 0 are hidden (not cluttering the display)
 - Compare counts: navigate to `/browse`, apply "No Definition" filter, verify count matches dashboard chip
 - Return to `/`, verify "Enrich N cards" button is shown when cards need attention
 
@@ -173,12 +176,30 @@ Before running tests, configure all API keys via the **Settings page** (`/settin
 - Verify total count shown, cards render in table
 - Verify columns: Word, Sentence, Definition, Audio, Image, Tags
 
-### 3b. Quick filters
+### 3b. Quick filters — Row 1 (essential)
+- Verify Row 1 shows: All, No Definition, No Audio, No Image, Complete (with tag chips after separator)
 - Click "No Definition" — verify only cards without definitions shown, count matches chip
 - Click "No Audio" — same check
 - Click "No Image" — same check
-- Click "Complete" — verify all shown cards have all fields filled
+- Click "Complete" — verify only cards with ALL available fields filled shown (smart completeness)
 - Click "All" — verify full list returns
+
+### 3b2. Quick filters — Row 2 (extended)
+- Verify Row 2 appears below Row 1 with slightly smaller chips
+- Verify Row 2 shows: No Sentence, No Phonetic, No Sentence Audio
+- Click "No Sentence" — verify only cards without Main Sentence shown
+- Click "No Phonetic" — verify only cards without Phonetic symbol shown
+- Click "No Sentence Audio" — verify only cards WITH a sentence but WITHOUT sentence audio shown
+- Navigate to Browse with Chinese deck (`/browse?deck=Gao%20Chinese`)
+- Verify "No Stroke Order" chip appears in Row 2 (Chinese only)
+- Click "No Stroke Order" — verify only cards without Stroke Order Anim shown
+- Navigate back to English deck — verify "No Stroke Order" chip is NOT shown
+
+### 3b3. Quick filters — URL parameter
+- Navigate to `/browse?filter=missing_definition`
+- Verify "No Definition" filter is pre-selected on page load
+- Navigate to `/browse?filter=missing_sentence_audio`
+- Verify "No Sentence Audio" filter is pre-selected
 
 ### 3c. Column sorting
 - Click "Word" header — verify alphabetical sort (A-Z)

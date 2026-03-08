@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ankiConnect } from "@/lib/anki-connect";
 import { getAllLanguages, getLanguageByDeck } from "@/lib/languages";
+import { getCardCompleteness } from "@/lib/card-completeness";
 
 export const dynamic = "force-dynamic";
 
@@ -49,6 +50,12 @@ function emptyStats() {
     missingAudio: 0,
     missingImage: 0,
     missingSentence: 0,
+    missingPhonetic: 0,
+    missingSentenceAudio: 0,
+    missingStrokeOrder: 0,
+    missingSynonyms: 0,
+    missingExtraInfo: 0,
+    missingSentencePinyin: 0,
     complete: 0,
     needsAttention: 0,
     needsAttentionNoteIds: [],
@@ -62,31 +69,41 @@ async function getDeckStats(deck: string) {
   if (total === 0) return emptyStats();
 
   const notes = await ankiConnect.notesInfo(noteIds);
+  const lang = getLanguageByDeck(deck);
+  const isChinese = lang?.id === "chinese";
 
   let missingDefinition = 0;
   let missingAudio = 0;
   let missingImage = 0;
   let missingSentence = 0;
+  let missingPhonetic = 0;
+  let missingSentenceAudio = 0;
+  let missingStrokeOrder = 0;
+  let missingSynonyms = 0;
+  let missingExtraInfo = 0;
+  let missingSentencePinyin = 0;
   const needsAttentionNoteIds: number[] = [];
 
   for (const note of notes) {
-    const def = note.fields?.Definition?.value?.trim();
-    const audio = note.fields?.Audio?.value?.trim();
-    const picture = note.fields?.Picture?.value?.trim();
-    const sentence = note.fields?.["Main Sentence"]?.value?.trim();
+    const result = getCardCompleteness(note.fields, isChinese);
 
-    const hasDef = !!def;
-    const hasAudio = !!audio;
-    const hasPicture = !!picture;
-    const hasSentence = !!sentence;
-
-    if (!hasDef) missingDefinition++;
-    if (!hasAudio) missingAudio++;
-    if (!hasPicture) missingImage++;
-    if (!hasSentence) missingSentence++;
-
-    if (!hasDef || !hasAudio || !hasPicture) {
+    if (!result.complete) {
       needsAttentionNoteIds.push(note.noteId);
+    }
+
+    for (const key of result.missing) {
+      switch (key) {
+        case "definition": missingDefinition++; break;
+        case "audio": missingAudio++; break;
+        case "image": missingImage++; break;
+        case "sentence": missingSentence++; break;
+        case "phonetic": missingPhonetic++; break;
+        case "sentence_audio": missingSentenceAudio++; break;
+        case "strokeOrder": missingStrokeOrder++; break;
+        case "synonyms": missingSynonyms++; break;
+        case "extra_info": missingExtraInfo++; break;
+        case "sentencePinyin": missingSentencePinyin++; break;
+      }
     }
   }
 
@@ -99,6 +116,12 @@ async function getDeckStats(deck: string) {
     missingAudio,
     missingImage,
     missingSentence,
+    missingPhonetic,
+    missingSentenceAudio,
+    missingStrokeOrder,
+    missingSynonyms,
+    missingExtraInfo,
+    missingSentencePinyin,
     complete,
     needsAttention,
     needsAttentionNoteIds,
