@@ -719,7 +719,13 @@ export async function runFullPipeline(
   }
 
   // 3. Enrich text fields (chunked)
-  // Pass source sentences to batchEnrichText as context
+  // Skip "sentence" generation if all items already have pre-filled sentences
+  const allHaveSentences = newItems.every((item) => !!item.sentence);
+  const allTextFields = getTextFieldsForLanguage(language);
+  const enrichFields: TextEnrichField[] = allHaveSentences
+    ? allTextFields.filter((f) => f !== "sentence")
+    : allTextFields;
+
   await progress.update(
     `[${language.label}] Enriching text for ${created.length} words...`
   );
@@ -731,7 +737,7 @@ export async function runFullPipeline(
         word: c.word,
         sentence: c.sentence || undefined,
       })),
-      undefined,
+      enrichFields,
       language,
       (chunk, total) => {
         if (total > 1) {
