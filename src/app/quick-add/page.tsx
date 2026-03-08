@@ -8,10 +8,12 @@ import {
   RotateCcw,
   Send,
   Sparkles,
+  MessageSquareText,
 } from "lucide-react";
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
 import { DistributionTargets, DistributionStatus } from "@/components/shared/DistributionTargets";
 import type { DistributeResult } from "@/types/anki";
+import { isSentenceInput } from "@/lib/languages";
 
 type Phase = "input" | "checking" | "duplicates" | "submitting" | "done";
 
@@ -24,11 +26,23 @@ function detectLang(text: string): { id: "english" | "chinese"; deck: string; no
 }
 
 /** Build fields for a quick-add note based on language */
-function buildQuickAddFields(word: string, lang: ReturnType<typeof detectLang>): Record<string, string> {
+function buildQuickAddFields(word: string, lang: ReturnType<typeof detectLang>, sentence?: string): Record<string, string> {
+  let mainSentence = "";
+  let cloze = "";
+
+  if (sentence) {
+    const regex = new RegExp(
+      `(${word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`,
+      "i"
+    );
+    mainSentence = sentence.replace(regex, '<span class="nodeword">$1</span>');
+    cloze = sentence.replace(regex, "{{c1::$1}}");
+  }
+
   const base: Record<string, string> = {
     Word: word,
-    "Main Sentence": "",
-    Cloze: "",
+    "Main Sentence": mainSentence,
+    Cloze: cloze,
     "Phonetic symbol": "",
     Audio: "",
     "Main Sentence Audio": "",
@@ -67,6 +81,10 @@ export default function QuickAddPage() {
   distTargetsRef.current = distTargets;
   const [distResults, setDistResults] = useState<DistributeResult[] | null>(null);
   const [distributing, setDistributing] = useState(false);
+  const [sentenceExtracting, setSentenceExtracting] = useState(false);
+  const [sentenceSource, setSentenceSource] = useState<string | null>(null);
+  // Map from extracted word (lowercased) to its source sentence
+  const [wordSentences, setWordSentences] = useState<Map<string, string>>(new Map());
 
   const words = wordsInput
     .split(/[,，、\n]/)
@@ -83,6 +101,51 @@ export default function QuickAddPage() {
 
   const checkAndSubmit = useCallback(async () => {
     if (words.length === 0) return;
+
+    // Check for sentences in the input
+    const inputLines = wordsInput.split(/[,，、\n]/).map(w => w.trim()).filter(Boolean);
+    const sentences = inputLines.filter(line => isSentenceInput(line));
+
+    if (sentences.length > 0 && !sentenceSource) {
+      setSentenceExtracting(true);
+      setError(null);
+      const newWordSentences = new Map<string, string>();
+      const allWords: string[] = [];
+
+      for (const line of inputLines) {
+        if (isSentenceInput(line)) {
+          try {
+            const res = await fetch("/api/extract-words", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ sentence: line }),
+            });
+            if (res.ok) {
+              const data = await res.json();
+              for (const w of data.words) {
+                allWords.push(w);
+                newWordSentences.set(w.toLowerCase(), line);
+              }
+            } else {
+              // If extraction fails for a sentence, keep it as-is
+              allWords.push(line);
+            }
+          } catch {
+            allWords.push(line);
+          }
+        } else {
+          allWords.push(line);
+        }
+      }
+
+      setWordSentences(newWordSentences);
+      setSentenceSource(sentences.join("; "));
+      setWordsInput(allWords.join("\n"));
+      setSentenceExtracting(false);
+      // Don't proceed to submit yet — let user review extracted words
+      return;
+    }
+
     setPhase("checking");
     setError(null);
     setDuplicateWords([]);
@@ -108,7 +171,7 @@ export default function QuickAddPage() {
       // If duplicate check fails, submit anyway (non-blocking)
       await submitWords(words);
     }
-  }, [words, detectedLang]);
+  }, [words, wordsInput, detectedLang, sentenceSource]);
 
   const submitWords = useCallback(async (wordsToSubmit: string[]) => {
     if (wordsToSubmit.length === 0) {
@@ -126,7 +189,7 @@ export default function QuickAddPage() {
       const notes = wordsToSubmit.map((word) => ({
         deckName: lang.deck,
         modelName: lang.noteType,
-        fields: buildQuickAddFields(word, lang),
+        fields: buildQuickAddFields(word, lang, wordSentences.get(word.toLowerCase())),
         tags: ["quick_add"],
       }));
 
@@ -175,7 +238,7 @@ export default function QuickAddPage() {
       setError(err instanceof Error ? err.message : "Submit failed");
       setPhase("input");
     }
-  }, []);
+  }, [wordSentences]);
 
   const confirmSubmit = useCallback(() => {
     submitWords(wordsToAdd);
@@ -203,6 +266,9 @@ export default function QuickAddPage() {
     setSkippedWords(new Set());
     setDistResults(null);
     setDistributing(false);
+    setSentenceSource(null);
+    setWordSentences(new Map());
+    setSentenceExtracting(false);
   };
 
   const isDuplicate = (word: string) =>
@@ -320,10 +386,36 @@ export default function QuickAddPage() {
         </div>
       ) : (
         <div className="space-y-4">
+          {sentenceExtracting && (
+            <div className="rounded-lg border border-primary/50 bg-primary/5 p-4">
+              <div className="flex items-center gap-2">
+                <LoadingSpinner size="sm" className="text-primary" />
+                <span className="text-sm font-medium">Extracting vocabulary words from sentence...</span>
+              </div>
+            </div>
+          )}
+
+          {sentenceSource && !sentenceExtracting && (
+            <div className="rounded-lg border border-primary/50 bg-primary/5 p-4">
+              <div className="flex items-start gap-2">
+                <MessageSquareText className="mt-0.5 h-5 w-5 text-primary shrink-0" />
+                <div>
+                  <h3 className="text-sm font-semibold">Words extracted from sentence</h3>
+                  <p className="mt-0.5 text-xs text-muted-foreground italic">
+                    &ldquo;{sentenceSource}&rdquo;
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Review the words below, edit if needed, then click Add to submit.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div>
             <label className="text-sm font-medium">Words or phrases</label>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              One per line, or comma-separated. Language is auto-detected.
+              One per line, or comma-separated. You can also paste a sentence to extract vocabulary.
             </p>
             <textarea
               value={wordsInput}
@@ -331,7 +423,7 @@ export default function QuickAddPage() {
               rows={8}
               placeholder={"creature\ncamouflage\ncame down with\nsharp and pointy"}
               className="mt-2 w-full rounded-md border border-border bg-background px-3 py-2 text-sm font-mono placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none"
-              disabled={phase === "checking" || phase === "submitting"}
+              disabled={phase === "checking" || phase === "submitting" || sentenceExtracting}
             />
           </div>
 
@@ -350,19 +442,21 @@ export default function QuickAddPage() {
             <div className="flex items-center gap-3">
               <button
                 onClick={checkAndSubmit}
-                disabled={phase === "checking" || phase === "submitting"}
+                disabled={phase === "checking" || phase === "submitting" || sentenceExtracting}
                 className="inline-flex items-center gap-2 rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-50"
               >
-                {phase === "checking" || phase === "submitting" ? (
+                {phase === "checking" || phase === "submitting" || sentenceExtracting ? (
                   <LoadingSpinner size="sm" className="text-primary-foreground" />
                 ) : (
                   <Send className="h-4 w-4" />
                 )}
-                {phase === "checking"
-                  ? "Checking..."
-                  : phase === "submitting"
-                    ? "Adding..."
-                    : `Add ${words.length} word${words.length !== 1 ? "s" : ""} to Anki`}
+                {sentenceExtracting
+                  ? "Extracting..."
+                  : phase === "checking"
+                    ? "Checking..."
+                    : phase === "submitting"
+                      ? "Adding..."
+                      : `Add ${words.length} word${words.length !== 1 ? "s" : ""} to Anki`}
               </button>
               <span className="text-xs text-muted-foreground">
                 Cards will be created with Word only — enrich them afterwards
