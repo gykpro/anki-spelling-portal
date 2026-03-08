@@ -677,8 +677,8 @@ function EnrichContent() {
         [noteId]: { ...prev[noteId], saved: true },
       }));
 
-      // Distribute to target profiles (with media)
-      if (distTargets.length > 0) {
+      // Distribute to target profiles (skip when called from batch save — batch distributes at the end)
+      if (!skipRefresh && distTargets.length > 0) {
         distribute([noteId], distTargets, mediaFiles.length > 0 ? mediaFiles : undefined);
       }
 
@@ -826,6 +826,12 @@ function EnrichContent() {
       savedCount++;
       setSaveAllProgress({ current: savedCount, total: unsavedNoteIds.length });
       setBatchProgress(`Saved ${savedCount}/${unsavedNoteIds.length}...`);
+    }
+
+    // Distribute all saved notes in one batch (single profile switch round-trip)
+    if (distTargets.length > 0) {
+      setBatchProgress("Distributing to other profiles...");
+      await distribute(unsavedNoteIds, distTargets);
     }
 
     setBatchProgress(`All ${savedCount} cards saved`);
