@@ -28,6 +28,9 @@ export async function POST(request: NextRequest) {
     }
 
     const results = await writeQueue.enqueue(async () => {
+      // Sync before distributing to ensure current profile is up-to-date
+      await ankiConnect.syncBeforeWrite();
+
       // Fetch source notes from current profile
       const sourceNotes = await ankiConnect.notesInfo(noteIds);
       if (sourceNotes.length === 0) {
@@ -84,6 +87,8 @@ export async function POST(request: NextRequest) {
                   console.warn(`[Distribute] Failed to store media "${filename}" in ${targetProfile}:`, err);
                 }
               }
+              // Allow Anki to finish internal media sync before proceeding
+              await new Promise((r) => setTimeout(r, 2000));
             }
 
             let distributed = 0;
