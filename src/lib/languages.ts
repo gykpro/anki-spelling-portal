@@ -102,8 +102,10 @@ export function isSentenceInput(text: string): boolean {
   const trimmed = text.trim();
   if (!trimmed) return false;
 
-  // Sentence-ending punctuation → sentence
-  if (/[。！？.!?]/.test(trimmed)) return true;
+  // Chinese/special sentence-ending punctuation → sentence
+  if (/[。！？!?]$/.test(trimmed)) return true;
+  // English period: only if at end AND has multiple words (avoids "Dr.", "3.5", etc.)
+  if (/\.\s*$/.test(trimmed) && trimmed.split(/\s+/).length > 2) return true;
 
   const hasCJK = /[\u4e00-\u9fff]/.test(trimmed);
 

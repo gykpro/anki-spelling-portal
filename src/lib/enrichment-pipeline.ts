@@ -755,7 +755,12 @@ export async function runFullPipeline(
   for (const result of enrichResults) {
     if (!result.error) {
       try {
-        await saveTextToAnki(result.noteId, result.word, result, language);
+        // Don't overwrite pre-filled source sentence with AI-generated one
+        const sourceItem = created.find((x) => x.noteId === result.noteId);
+        const resultToSave = sourceItem?.sentence
+          ? { ...result, sentence: undefined }
+          : result;
+        await saveTextToAnki(resultToSave.noteId, resultToSave.word, resultToSave, language);
         // Update sentence in created array for downstream audio/image generation
         if (result.sentence) {
           const c = created.find((x) => x.noteId === result.noteId);
@@ -951,7 +956,12 @@ export async function runFullPipelineFromExtraction(
   for (const result of enrichResults) {
     if (!result.error) {
       try {
-        await saveTextToAnki(result.noteId, result.word, result, language);
+        // Don't overwrite pre-filled source sentence with AI-generated one
+        const sourceItem = created.find((x) => x.noteId === result.noteId);
+        const resultToSave = sourceItem?.sentence
+          ? { ...result, sentence: undefined }
+          : result;
+        await saveTextToAnki(resultToSave.noteId, resultToSave.word, resultToSave, language);
         // Update sentence in created array for downstream audio/image generation
         if (result.sentence) {
           const c = created.find((x) => x.noteId === result.noteId);
