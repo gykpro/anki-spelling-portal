@@ -424,17 +424,17 @@ export async function checkDuplicates(
   return dupes;
 }
 
-/** Create notes in Anki for given words. Returns array of created note IDs. */
+/** Create notes in Anki for given words (with optional source sentences). Returns array of created note IDs. */
 export async function createWordNotes(
-  words: string[],
+  items: { word: string; sentence?: string }[],
   lang?: LanguageConfig
-): Promise<{ noteId: number; word: string }[]> {
-  const cards: SpellingCard[] = words.map((word) => ({
+): Promise<{ noteId: number; word: string; sentence?: string }[]> {
+  const cards: SpellingCard[] = items.map((item) => ({
     id: `tg_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-    word,
-    sentence: "",
-    mainSentence: "",
-    cloze: "",
+    word: item.word,
+    sentence: item.sentence ?? "",
+    mainSentence: item.sentence ? buildMainSentence(item.sentence, item.word) : "",
+    cloze: item.sentence ? buildCloze(item.sentence, item.word) : "",
     termWeek: "telegram",
     topic: "telegram",
     edited: false,
@@ -443,10 +443,10 @@ export async function createWordNotes(
   const noteParams = cards.map((c) => cardToAnkiNote(c, lang));
   const noteIds = await ankiConnect.addNotes(noteParams);
 
-  const created: { noteId: number; word: string }[] = [];
+  const created: { noteId: number; word: string; sentence?: string }[] = [];
   for (let i = 0; i < noteIds.length; i++) {
     if (noteIds[i] !== null) {
-      created.push({ noteId: noteIds[i]!, word: words[i] });
+      created.push({ noteId: noteIds[i]!, word: items[i].word, sentence: items[i].sentence });
     }
   }
   return created;
@@ -679,52 +679,58 @@ export async function generateAndSaveStrokeOrder(
   return mediaFiles;
 }
 
-/** Run the full enrichment pipeline for a list of words */
+/** Run the full enrichment pipeline for a list of words (with optional source sentences) */
 export async function runFullPipeline(
-  words: string[],
+  words: { word: string; sentence?: string }[],
   progress: PipelineProgress,
   lang?: LanguageConfig
 ): Promise<{ created: number; duplicates: number; errors: string[] }> {
-  const language = lang ?? detectLanguage(words[0] || "");
+  const language = lang ?? detectLanguage(words[0]?.word || "");
   const errors: string[] = [];
 
-  // 1. Check duplicates
+  // 1. Check duplicates (by word text only)
+  const wordStrings = words.map((w) => w.word);
   await progress.update(`[${language.label}] Checking duplicates for ${words.length} words...`);
-  const dupes = await checkDuplicates(words, language);
-  let newWords = words.filter((w) => !dupes.has(w.toLowerCase()));
+  const dupes = await checkDuplicates(wordStrings, language);
+  let newItems = words.filter((w) => !dupes.has(w.word.toLowerCase()));
 
-  if (newWords.length === 0) {
+  if (newItems.length === 0) {
     return { created: 0, duplicates: dupes.size, errors };
   }
 
   // Cap at MAX_PIPELINE_WORDS
-  if (newWords.length > MAX_PIPELINE_WORDS) {
-    const totalNew = newWords.length;
-    newWords = newWords.slice(0, MAX_PIPELINE_WORDS);
+  if (newItems.length > MAX_PIPELINE_WORDS) {
+    const totalNew = newItems.length;
+    newItems = newItems.slice(0, MAX_PIPELINE_WORDS);
     await progress.send(
       `Processing first ${MAX_PIPELINE_WORDS} of ${totalNew} new words. Send all words again to process the rest (duplicates are auto-skipped).`
     );
   }
 
   await progress.update(
-    `[${language.label}] ${dupes.size} duplicate(s) skipped. Creating ${newWords.length} notes in ${language.deck}...`
+    `[${language.label}] ${dupes.size} duplicate(s) skipped. Creating ${newItems.length} notes in ${language.deck}...`
   );
 
-  // 2. Sync and create notes
+  // 2. Sync and create notes (with source sentences when available)
   await ankiConnect.syncBeforeWrite();
-  const created = await createWordNotes(newWords, language);
+  const created = await createWordNotes(newItems, language);
   if (created.length === 0) {
     return { created: 0, duplicates: dupes.size, errors: ["Failed to create any notes"] };
   }
 
   // 3. Enrich text fields (chunked)
+  // Pass source sentences to batchEnrichText as context
   await progress.update(
     `[${language.label}] Enriching text for ${created.length} words...`
   );
   let enrichResults: BatchEnrichResultItem[];
   try {
     enrichResults = await batchEnrichText(
-      created,
+      created.map((c) => ({
+        noteId: c.noteId,
+        word: c.word,
+        sentence: c.sentence || undefined,
+      })),
       undefined,
       language,
       (chunk, total) => {
@@ -744,6 +750,11 @@ export async function runFullPipeline(
     if (!result.error) {
       try {
         await saveTextToAnki(result.noteId, result.word, result, language);
+        // Update sentence in created array for downstream audio/image generation
+        if (result.sentence) {
+          const c = created.find((x) => x.noteId === result.noteId);
+          if (c && !c.sentence) c.sentence = result.sentence;
+        }
       } catch (err) {
         errors.push(`Save text for "${result.word}": ${err instanceof Error ? err.message : String(err)}`);
       }
@@ -751,42 +762,48 @@ export async function runFullPipeline(
   }
 
   // 5. Generate and save audio (collect media for distribution)
+  // Use source sentence if available, otherwise fall back to enriched sentence
   const mediaCache = new Map<string, string>();
-  for (let i = 0; i < enrichResults.length; i++) {
-    const result = enrichResults[i];
-    if (result.error) continue;
+  for (let i = 0; i < created.length; i++) {
+    const c = created[i];
+    const enrichResult = enrichResults.find((r) => r.noteId === c.noteId);
+    if (enrichResult?.error) continue;
+    const sentence = c.sentence || enrichResult?.sentence;
     await progress.update(
-      `[${language.label}] Audio ${i + 1}/${enrichResults.length}: ${result.word}`
+      `[${language.label}] Audio ${i + 1}/${created.length}: ${c.word}`
     );
     try {
       const mediaFiles = await generateAndSaveAudio(
-        result.noteId,
-        result.word,
-        result.sentence,
+        c.noteId,
+        c.word,
+        sentence,
         language
       );
       for (const mf of mediaFiles) mediaCache.set(mf.filename, mf.data);
     } catch (err) {
-      errors.push(`Audio for "${result.word}": ${err instanceof Error ? err.message : String(err)}`);
+      errors.push(`Audio for "${c.word}": ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 
   // 6. Generate and save images (collect media for distribution)
-  for (let i = 0; i < enrichResults.length; i++) {
-    const result = enrichResults[i];
-    if (result.error || !result.sentence) continue;
+  for (let i = 0; i < created.length; i++) {
+    const c = created[i];
+    const enrichResult = enrichResults.find((r) => r.noteId === c.noteId);
+    if (enrichResult?.error) continue;
+    const sentence = c.sentence || enrichResult?.sentence;
+    if (!sentence) continue;
     await progress.update(
-      `[${language.label}] Image ${i + 1}/${enrichResults.length}: ${result.word}`
+      `[${language.label}] Image ${i + 1}/${created.length}: ${c.word}`
     );
     try {
       const mediaFiles = await generateAndSaveImage(
-        result.noteId,
-        result.word,
-        result.sentence
+        c.noteId,
+        c.word,
+        sentence
       );
       for (const mf of mediaFiles) mediaCache.set(mf.filename, mf.data);
     } catch (err) {
-      errors.push(`Image for "${result.word}": ${err instanceof Error ? err.message : String(err)}`);
+      errors.push(`Image for "${c.word}": ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 

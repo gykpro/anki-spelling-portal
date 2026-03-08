@@ -16,6 +16,7 @@ import { t } from "./i18n";
 export interface QueueEntry {
   word: string;
   lang: LanguageConfig;
+  sourceSentence?: string;
 }
 
 interface ChatQueue {
@@ -175,15 +176,15 @@ class WordQueue {
     }
 
     // 4. Group entries by language
-    const groups = new Map<string, { lang: LanguageConfig; words: string[] }>();
+    const groups = new Map<string, { lang: LanguageConfig; items: { word: string; sentence?: string }[] }>();
     for (const entry of entries) {
       const key = entry.lang.id;
       let group = groups.get(key);
       if (!group) {
-        group = { lang: entry.lang, words: [] };
+        group = { lang: entry.lang, items: [] };
         groups.set(key, group);
       }
-      group.words.push(entry.word);
+      group.items.push({ word: entry.word, sentence: entry.sourceSentence });
     }
 
     // 5. Process each language group through the write queue
@@ -194,9 +195,9 @@ class WordQueue {
       try {
         const result = await writeQueue.enqueue(async () => {
           await progress.update(
-            t(chatId, "queue_adding", group.words.length, group.lang.label, group.lang.deck)
+            t(chatId, "queue_adding", group.items.length, group.lang.label, group.lang.deck)
           );
-          return runFullPipeline(group.words, progress, group.lang);
+          return runFullPipeline(group.items, progress, group.lang);
         });
         allResults.push({ lang: group.lang.label, ...result });
       } catch (err) {
