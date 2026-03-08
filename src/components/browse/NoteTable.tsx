@@ -13,6 +13,7 @@ interface NoteTableProps {
   selectedIds: Set<number>;
   onToggleSelect: (noteId: number) => void;
   onSelectAll: () => void;
+  onNoteClick?: (note: AnkiNote) => void;
   page: number;
   pageSize: number;
   onPageChange: (page: number) => void;
@@ -59,6 +60,7 @@ export function NoteTable({
   selectedIds,
   onToggleSelect,
   onSelectAll,
+  onNoteClick,
   page,
   pageSize,
   onPageChange,
@@ -212,7 +214,18 @@ export function NoteTable({
                       className="rounded"
                     />
                   </td>
-                  <td className="p-3 font-medium">{word}</td>
+                  <td className="p-3 font-medium">
+                    {onNoteClick ? (
+                      <button
+                        onClick={() => onNoteClick(note)}
+                        className="text-left hover:underline hover:text-primary cursor-pointer transition-colors"
+                      >
+                        {word}
+                      </button>
+                    ) : (
+                      word
+                    )}
+                  </td>
                   <td className="max-w-xs truncate p-3 text-muted-foreground">
                     {sentence}
                   </td>

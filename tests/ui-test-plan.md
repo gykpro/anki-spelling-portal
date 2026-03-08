@@ -228,6 +228,27 @@ Before running tests, configure all API keys via the **Settings page** (`/settin
 - Check "select all" header checkbox
 - Verify all visible cards selected
 
+### 3h. Word Detail Drawer
+- Click on any word in the Word column
+- Verify a slide-out drawer appears from the right side
+- Verify drawer shows the word as title with note type and ID
+- Verify sections: Core (Word, Main Sentence, Cloze, Definition), Phonetics & Language (Phonetic Symbol, Main Sentence Pinyin for Chinese), Extended (Synonyms, Extra Information), Media (Audio, Main Sentence Audio, Picture, Stroke Order for Chinese)
+- Verify filled fields show green checkmark, empty fields show gray dash with "Empty" text
+- Verify "Enrich" button in header links to `/enrich?noteIds=<noteId>`
+- Press Escape — verify drawer closes
+- Click a different word — verify drawer updates to the new card
+- Click the overlay area outside the drawer — verify it closes
+
+### 3h2. Word Detail Drawer — Stroke Order status
+- Navigate to Chinese deck (`/browse?deck=Gao%20Chinese`)
+- Click on a single-character word with stroke order — verify Stroke Order shows green checkmark
+- Click on a multi-character word missing some stroke order GIFs — verify Stroke Order shows "(partial: N/M chars)" warning
+
+### 3h3. Stroke Order filter — partial detection
+- Navigate to Chinese deck, click "No Stroke Order" filter
+- Verify the count includes cards with partial stroke order (fewer `<img>` tags than CJK characters in the word)
+- Verify cards with complete stroke order (matching img count) are NOT shown
+
 ---
 
 ## 4. Enrich
@@ -307,6 +328,15 @@ Before running tests, configure all API keys via the **Settings page** (`/settin
 - Navigate to enrich with that card
 - Click "Enrich All Empty" — verify it processes (even single cards)
 - Verify result or error shown for that card
+
+### 4k2. Save All — progress banner and navigation guard
+- On the enrich page with multiple cards with generated results
+- Click "Save All"
+- Verify a prominent progress banner appears above the card list showing "Saving X/Y cards..." with a spinner and progress bar
+- Verify progress bar fills as cards are saved
+- Verify the banner turns green with "All N cards saved successfully" when done
+- Verify the banner auto-dismisses after 3 seconds
+- (Navigation guard) During save, attempt to close the browser tab — verify browser shows "Leave site?" confirmation dialog
 
 ### 4m. Batch with no empty fields
 - On a card that already has all text fields filled, verify "Enrich All Empty" shows count (0) and is disabled

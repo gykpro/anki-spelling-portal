@@ -15,6 +15,9 @@
 ## Pending
 
 ## Recently Completed
+- [x] **Word Detail Drawer** — Click any word on Browse page to open a slide-out drawer showing all card fields grouped into sections (Core, Phonetics, Extended, Media). Shows field fill status with checkmarks, stroke order partial completeness indicator, and quick Enrich link. Closes via X, Escape, or click-outside.
+- [x] **Fix: Save All Progress + Navigation Guard** — Save All now shows a prominent progress banner with progress bar and card counter. Navigation guard (`beforeunload`) prevents accidental page leave during save or batch enrichment. Banner auto-dismisses after 3 seconds on completion.
+- [x] **Fix: Stroke Order Completeness Filter** — "No Stroke Order" filter on Browse now detects partial stroke order (fewer `<img>` tags than CJK characters in the word). Also used by the "Complete" filter and dashboard stats. `isStrokeOrderComplete()` helper in `card-completeness.ts`.
 - [x] **Smart Completeness Filters** — Redefined "Complete" to mean ALL available fields filled (language-aware). Added granular filter chips for every enrichable field on Browse page (two-row layout: essential + extended). Dashboard shows per-language completeness sections with zero-count chips hidden. Chinese-only filters (Stroke Order, Sentence Pinyin) conditional on deck. Shared `card-completeness.ts` utility used by both stats API and browse page.
 - [x] **Per-User Language Preference for Telegram Bot** — `/lang` command lets each user choose English or Chinese for all bot replies. Persisted per Telegram user ID in `data/telegram-user-prefs.json`. All bot strings go through `t(userId, key)` i18n function.
 - [x] **Queue Edit — Remove Words from Pending Queue** — "Edit Queue" button alongside "Start Now" lets users view and remove individual words before batch processing. Handles re-indexing, empty queue cleanup (timer cancellation + status message deletion), and "Done" dismissal.

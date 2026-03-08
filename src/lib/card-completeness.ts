@@ -56,6 +56,14 @@ export function getCardCompleteness(
     if (check.conditional === "chinese" && !isChinese) continue;
     if (check.conditional === "hasSentence" && !hasSentence) continue;
 
+    // Special handling for stroke order: check completeness (partial = missing)
+    if (check.key === "strokeOrder") {
+      if (!isStrokeOrderComplete(fields)) {
+        missing.push(check.key);
+      }
+      continue;
+    }
+
     const value = fields[check.ankiField]?.value?.trim();
     if (!value) {
       missing.push(check.key);
@@ -63,6 +71,24 @@ export function getCardCompleteness(
   }
 
   return { complete: missing.length === 0, missing };
+}
+
+/**
+ * Check if stroke order is complete by comparing <img> tag count
+ * to the number of CJK characters in the word.
+ */
+export function isStrokeOrderComplete(
+  fields: Record<string, { value: string }>
+): boolean {
+  const strokeValue = fields["Stroke Order Anim"]?.value?.trim();
+  if (!strokeValue) return false;
+
+  const word = fields["Word"]?.value?.trim() || "";
+  const cjkChars = word.match(/[\u4e00-\u9fff\u3400-\u4dbf]/g) || [];
+  if (cjkChars.length === 0) return true; // Non-CJK word, nothing to check
+
+  const imgCount = (strokeValue.match(/<img/g) || []).length;
+  return imgCount >= cjkChars.length;
 }
 
 /** Get all field check definitions (for iteration in UI) */

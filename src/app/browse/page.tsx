@@ -4,10 +4,11 @@ import { Suspense, useState, useEffect, useCallback, useMemo, useRef } from "rea
 import { useSearchParams } from "next/navigation";
 import { Search, RefreshCw, Filter } from "lucide-react";
 import { NoteTable } from "@/components/browse/NoteTable";
+import { NoteDetailDrawer } from "@/components/browse/NoteDetailDrawer";
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
 import { cn } from "@/lib/utils";
 import { getAllLanguages, getLanguageByDeck } from "@/lib/languages";
-import { getCardCompleteness } from "@/lib/card-completeness";
+import { getCardCompleteness, isStrokeOrderComplete } from "@/lib/card-completeness";
 import type { AnkiNote } from "@/types/anki";
 
 type QuickFilter =
@@ -72,6 +73,7 @@ function BrowseContent() {
   );
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
+  const [selectedNote, setSelectedNote] = useState<AnkiNote | null>(null);
 
   const fetchNotes = useCallback(async (query?: string) => {
     setLoading(true);
@@ -147,7 +149,7 @@ function BrowseContent() {
           return hasSentence && !hasSentenceAudio;
         }
         case "missing_stroke_order":
-          return !getFieldValue(note, "Stroke Order Anim");
+          return !isStrokeOrderComplete(note.fields);
         case "has_all": {
           const result = getCardCompleteness(note.fields, !!isChinese);
           return result.complete;
@@ -177,7 +179,7 @@ function BrowseContent() {
       if (!getFieldValue(note, "Picture")) counts.missing_image++;
       if (!getFieldValue(note, "Main Sentence")) counts.missing_sentence++;
       if (!getFieldValue(note, "Phonetic symbol")) counts.missing_phonetic++;
-      if (!getFieldValue(note, "Stroke Order Anim")) counts.missing_stroke_order++;
+      if (!isStrokeOrderComplete(note.fields)) counts.missing_stroke_order++;
       const hasSentence = !!getFieldValue(note, "Main Sentence");
       if (hasSentence && !getFieldValue(note, "Main Sentence Audio")) counts.missing_sentence_audio++;
       const result = getCardCompleteness(note.fields, !!isChinese);
@@ -376,12 +378,19 @@ function BrowseContent() {
           selectedIds={selectedIds}
           onToggleSelect={toggleSelect}
           onSelectAll={selectAll}
+          onNoteClick={setSelectedNote}
           page={page}
           pageSize={pageSize}
           onPageChange={setPage}
           onPageSizeChange={setPageSize}
         />
       )}
+
+      {/* Word detail drawer */}
+      <NoteDetailDrawer
+        note={selectedNote}
+        onClose={() => setSelectedNote(null)}
+      />
     </div>
   );
 }

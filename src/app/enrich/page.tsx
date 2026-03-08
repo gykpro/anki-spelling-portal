@@ -408,6 +408,8 @@ function EnrichContent() {
   const [batchEnriching, setBatchEnriching] = useState(false);
   const [savingAll, setSavingAll] = useState(false);
   const [batchProgress, setBatchProgress] = useState("");
+  const [saveAllProgress, setSaveAllProgress] = useState<{ current: number; total: number } | null>(null);
+  const [saveAllDone, setSaveAllDone] = useState(false);
   const [autoEnrichPhase, setAutoEnrichPhase] = useState<string | null>(null);
   const autoEnrichTriggered = useRef(false);
   const [distTargets, setDistTargets] = useState<string[]>([]);
@@ -816,17 +818,28 @@ function EnrichContent() {
     if (unsavedNoteIds.length === 0) return;
 
     setSavingAll(true);
+    setSaveAllDone(false);
+    setSaveAllProgress({ current: 0, total: unsavedNoteIds.length });
     setBatchProgress(`Saving ${unsavedNoteIds.length} cards...`);
 
     let savedCount = 0;
     for (const noteId of unsavedNoteIds) {
       await save(noteId);
       savedCount++;
+      setSaveAllProgress({ current: savedCount, total: unsavedNoteIds.length });
       setBatchProgress(`Saved ${savedCount}/${unsavedNoteIds.length}...`);
     }
 
     setBatchProgress(`All ${savedCount} cards saved`);
     setSavingAll(false);
+    setSaveAllDone(true);
+
+    // Auto-dismiss the success banner after 3 seconds
+    setTimeout(() => {
+      setSaveAllProgress(null);
+      setSaveAllDone(false);
+      setBatchProgress("");
+    }, 3000);
   };
 
   const generateAllAudio = async () => {
@@ -1269,6 +1282,16 @@ function EnrichContent() {
     fetchNotes();
   }, [fetchNotes, distribute]);
 
+  // Navigation guard: warn before leaving during save/enrich
+  useEffect(() => {
+    if (!savingAll && !batchEnriching) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [savingAll, batchEnriching]);
+
   // Trigger auto-enrich when notes loaded and autoEnrich param present
   useEffect(() => {
     const shouldAutoEnrich = searchParams.get("autoEnrich") === "true";
@@ -1448,6 +1471,34 @@ function EnrichContent() {
           <span className="text-xs text-muted-foreground">{batchProgress}</span>
         )}
       </div>
+
+      {/* Save All progress banner */}
+      {(savingAll || saveAllDone) && saveAllProgress && (
+        <div className={cn(
+          "rounded-lg border p-4 text-sm",
+          saveAllDone
+            ? "border-success/50 bg-success/5 text-success"
+            : "border-primary/50 bg-primary/5 text-primary"
+        )}>
+          <div className="flex items-center gap-2">
+            {savingAll && <LoadingSpinner size="sm" />}
+            {saveAllDone && <Check className="h-4 w-4" />}
+            <span className="font-medium">
+              {saveAllDone
+                ? `All ${saveAllProgress.total} cards saved successfully`
+                : `Saving ${saveAllProgress.current}/${saveAllProgress.total} cards...`}
+            </span>
+          </div>
+          {savingAll && (
+            <div className="mt-2 h-1.5 w-full rounded-full bg-primary/20 overflow-hidden">
+              <div
+                className="h-full rounded-full bg-primary transition-all duration-300"
+                style={{ width: `${(saveAllProgress.current / saveAllProgress.total) * 100}%` }}
+              />
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Auto-enrich progress banner */}
       {autoEnrichPhase && (
