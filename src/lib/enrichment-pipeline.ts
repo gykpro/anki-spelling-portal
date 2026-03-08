@@ -249,18 +249,67 @@ export function extractJsonArray(text: string): Record<string, unknown>[] {
   if (s.startsWith("```")) {
     s = s.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
   }
+
+  // Try direct parse first
   try {
     const result = JSON.parse(s);
     if (Array.isArray(result)) return result;
   } catch {
     // Fall through to extraction
   }
+
+  // Extract array substring
   const start = s.indexOf("[");
   const end = s.lastIndexOf("]");
   if (start === -1 || end === -1 || end <= start) {
     throw new Error("No JSON array found in response");
   }
-  return JSON.parse(s.slice(start, end + 1));
+  let jsonStr = s.slice(start, end + 1);
+
+  // Try parsing the extracted substring
+  try {
+    return JSON.parse(jsonStr);
+  } catch {
+    // Attempt repair: fix common issues in AI-generated JSON
+  }
+
+  // Repair: remove trailing commas before } or ]
+  jsonStr = jsonStr.replace(/,\s*([}\]])/g, "$1");
+
+  // Repair: fix unescaped newlines inside string values
+  jsonStr = jsonStr.replace(/(?<=:\s*"[^"]*)\n(?=[^"]*")/g, "\\n");
+
+  // Repair: fix unescaped control characters
+  // eslint-disable-next-line no-control-regex
+  jsonStr = jsonStr.replace(/[\x00-\x1f]/g, (ch) => {
+    if (ch === "\n") return "\\n";
+    if (ch === "\r") return "\\r";
+    if (ch === "\t") return "\\t";
+    return "";
+  });
+
+  try {
+    return JSON.parse(jsonStr);
+  } catch (err) {
+    // Last resort: try to extract individual JSON objects
+    const objects: Record<string, unknown>[] = [];
+    const objRegex = /\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g;
+    let match;
+    while ((match = objRegex.exec(jsonStr)) !== null) {
+      try {
+        objects.push(JSON.parse(match[0]));
+      } catch {
+        // Skip malformed objects
+      }
+    }
+    if (objects.length > 0) {
+      console.warn(`[extractJsonArray] Recovered ${objects.length} objects from malformed JSON`);
+      return objects;
+    }
+    throw new Error(
+      `Failed to parse JSON array: ${err instanceof Error ? err.message : "Unknown error"}`
+    );
+  }
 }
 
 export function buildBatchPrompt(
@@ -411,35 +460,48 @@ export async function batchEnrichText(
     const chunk = chunks[ci];
     onChunkProgress?.(ci + 1, chunks.length);
 
-    const prompt = buildBatchPrompt(chunk, enrichFields, language);
-    const rawText = await runAI(prompt);
-    const parsed = extractJsonArray(rawText);
+    try {
+      const prompt = buildBatchPrompt(chunk, enrichFields, language);
+      const rawText = await runAI(prompt);
+      const parsed = extractJsonArray(rawText);
 
-    for (let i = 0; i < chunk.length; i++) {
-      const card = chunk[i];
-      const result =
-        parsed[i] ||
-        parsed.find(
-          (r) =>
-            r.word && String(r.word).toLowerCase() === card.word.toLowerCase()
-        );
+      for (let i = 0; i < chunk.length; i++) {
+        const card = chunk[i];
+        const result =
+          parsed[i] ||
+          parsed.find(
+            (r) =>
+              r.word && String(r.word).toLowerCase() === card.word.toLowerCase()
+          );
 
-      if (result) {
+        if (result) {
+          allResults.push({
+            noteId: card.noteId,
+            word: card.word,
+            sentence: result.sentence as string | undefined,
+            definition: result.definition as string | undefined,
+            phonetic: result.phonetic as string | undefined,
+            synonyms: result.synonyms as string[] | undefined,
+            extra_info: result.extra_info as string | undefined,
+            sentencePinyin: result.sentencePinyin as string | undefined,
+          });
+        } else {
+          allResults.push({
+            noteId: card.noteId,
+            word: card.word,
+            error: "No result returned for this word",
+          });
+        }
+      }
+    } catch (err) {
+      // Mark all words in failed chunk with error, continue with other chunks
+      const errMsg = err instanceof Error ? err.message : "Chunk enrichment failed";
+      console.error(`[batchEnrichText] Chunk ${ci + 1}/${chunks.length} failed: ${errMsg}`);
+      for (const card of chunk) {
         allResults.push({
           noteId: card.noteId,
           word: card.word,
-          sentence: result.sentence as string | undefined,
-          definition: result.definition as string | undefined,
-          phonetic: result.phonetic as string | undefined,
-          synonyms: result.synonyms as string[] | undefined,
-          extra_info: result.extra_info as string | undefined,
-          sentencePinyin: result.sentencePinyin as string | undefined,
-        });
-      } else {
-        allResults.push({
-          noteId: card.noteId,
-          word: card.word,
-          error: "No result returned for this word",
+          error: errMsg,
         });
       }
     }
