@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { DistributionTargets, DistributionStatus } from "@/components/shared/DistributionTargets";
 import type { DistributeResult } from "@/types/anki";
+import { getLanguageByNoteType, getLanguageById } from "@/lib/languages";
 
 function getFieldValue(note: AnkiNote, field: string): string {
   return note.fields[field]?.value || "";
@@ -695,16 +696,13 @@ function EnrichContent() {
   };
 
   const enrichAllEmpty = async () => {
-    // Collect cards with any empty text fields
-    const textFieldKeys: EnrichField[] = [
-      "sentence", "definition", "phonetic", "synonyms", "extra_info", "sentencePinyin",
-    ];
-
+    // Collect cards with any empty text fields (derived from language config)
     const cardsToEnrich: { noteId: number; word: string; sentence?: string; emptyFields: EnrichField[] }[] = [];
 
     for (const note of notes) {
       const info = getEnrichableFields(note);
-      const emptyTextFields = textFieldKeys.filter(
+      const lang = getLanguageByNoteType(note.modelName) ?? getLanguageById("english");
+      const emptyTextFields = (lang.enrichFields as EnrichField[]).filter(
         (f) => info.fields[f]?.available && !info.fields[f]?.filled
       );
       if (emptyTextFields.length > 0) {
@@ -1076,17 +1074,14 @@ function EnrichContent() {
 
   // Auto-enrich pipeline: text → save → audio → save
   const runAutoEnrichPipeline = useCallback(async (currentNotes: AnkiNote[]) => {
-    const textFieldKeys: EnrichField[] = [
-      "sentence", "definition", "phonetic", "synonyms", "extra_info",
-    ];
-
     // Phase 1: Batch text enrichment
     setAutoEnrichPhase("Generating text fields...");
     setBatchEnriching(true);
 
     const cardsToEnrich = currentNotes.map((note) => {
       const info = getEnrichableFields(note);
-      const emptyFields = textFieldKeys.filter(
+      const lang = getLanguageByNoteType(note.modelName) ?? getLanguageById("english");
+      const emptyFields = (lang.enrichFields as EnrichField[]).filter(
         (f) => info.fields[f]?.available && !info.fields[f]?.filled
       );
       return {
@@ -1317,7 +1312,8 @@ function EnrichContent() {
   // Count cards with empty text fields
   const cardsWithEmptyText = notes.filter((note) => {
     const info = getEnrichableFields(note);
-    return ["sentence", "definition", "phonetic", "synonyms", "extra_info", "sentencePinyin"].some(
+    const lang = getLanguageByNoteType(note.modelName) ?? getLanguageById("english");
+    return lang.enrichFields.some(
       (f) => info.fields[f as EnrichField]?.available && !info.fields[f as EnrichField]?.filled
     );
   }).length;

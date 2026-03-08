@@ -347,25 +347,8 @@ export interface PipelineProgress {
   update: (text: string) => Promise<void>;
 }
 
-const ALL_TEXT_FIELDS: TextEnrichField[] = [
-  "sentence",
-  "definition",
-  "phonetic",
-  "synonyms",
-  "extra_info",
-];
-
-const ALL_CHINESE_TEXT_FIELDS: TextEnrichField[] = [
-  "sentence",
-  "definition",
-  "phonetic",
-  "synonyms",
-  "extra_info",
-  "sentencePinyin",
-];
-
 function getTextFieldsForLanguage(lang: LanguageConfig): TextEnrichField[] {
-  return lang.id === "chinese" ? ALL_CHINESE_TEXT_FIELDS : ALL_TEXT_FIELDS;
+  return lang.enrichFields;
 }
 
 function stripHtml(html: string): string {
