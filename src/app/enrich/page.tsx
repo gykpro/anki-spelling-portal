@@ -1399,7 +1399,7 @@ function EnrichContent() {
           )}
           {batchEnriching
             ? "Enriching..."
-            : `Enrich All Empty (${cardsWithEmptyText})`}
+            : `Enrich All Empty Text (${cardsWithEmptyText})`}
         </button>
 
         <button
