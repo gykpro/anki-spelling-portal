@@ -82,7 +82,7 @@ function BrowseContent() {
         ? `deck:"${selectedDeck}" ${query}`
         : `deck:"${selectedDeck}"`;
       const res = await fetch(
-        `/api/anki/notes?q=${encodeURIComponent(q)}&limit=500`
+        `/api/anki/notes?q=${encodeURIComponent(q)}&limit=2000`
       );
       const data = await res.json();
       if (data.error) throw new Error(data.error);
