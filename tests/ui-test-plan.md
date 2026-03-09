@@ -928,6 +928,91 @@ These tests verify the skill scripts work correctly via command line.
 
 ---
 
+## 13. Sentence-to-Words Extraction
+
+### Pre-requisites
+- Dev server running on `localhost:3000`
+- Anki running with AnkiConnect
+- AI backend configured (Anthropic SDK or Claude CLI)
+
+### 13a. Quick Add — Chinese sentence detection
+- Navigate to `/quick-add`
+- Enter a Chinese sentence: `__test_孕妇被困在车里，没办法出来。`
+- Verify language indicator shows "Chinese"
+- Submit — verify "Extracting words..." phase appears
+- Verify extracted words shown as checkboxes with the source sentence displayed
+- Verify 1-3 words extracted (age-appropriate vocabulary)
+- Verify "Add N words to Anki" button appears
+- Click to confirm — verify cards created in "Gao Chinese" deck
+- Navigate to Browse (Chinese deck), find the created words
+- Verify each card has Main Sentence pre-filled with the original sentence
+
+### 13b. Quick Add — English sentence detection
+- Navigate to `/quick-add`
+- Enter an English sentence: `__test_The magnificent butterfly emerged from its chrysalis.`
+- Verify language indicator shows "English"
+- Submit — verify extraction flow (same as 13a)
+- Verify 1-3 English vocabulary words extracted
+- Confirm and verify cards created in "Gao English Spelling" deck with pre-filled Main Sentence
+
+### 13c. Quick Add — short word NOT detected as sentence
+- Navigate to `/quick-add`
+- Enter a short Chinese word: `__test_苹果` (2 chars, ≤5)
+- Submit — verify it's treated as a normal word (no extraction flow)
+- Verify card created directly (standard Quick Add behavior)
+
+### 13d. Quick Add — mixed words and sentences
+- Navigate to `/quick-add`
+- Enter multiple lines including both words and sentences:
+  ```
+  __test_example
+  __test_她在花园里种了许多美丽的花。
+  ```
+- Submit — verify words go through normal flow, sentence triggers extraction
+- Verify extracted sentence words shown alongside the regular word
+- Confirm all — verify all cards created
+
+### 13e. Quick Add — deselect extracted word
+- Navigate to `/quick-add`
+- Enter a sentence that extracts multiple words
+- In the confirmation UI, uncheck one of the extracted words
+- Verify only checked words are added to Anki
+- Verify unchecked word is NOT created
+
+### 13f. Enrichment — pre-filled sentence preserved
+- After creating cards via sentence extraction (from 13a or 13b)
+- Navigate to Enrich with those cards
+- Run "Enrich All Empty Text"
+- Verify text enrichment generates definition, phonetic, synonyms, extra info
+- Verify the Main Sentence field is NOT overwritten (still contains original sentence)
+- Save — verify Main Sentence in Anki is the original input sentence
+
+### 13g. Telegram — sentence detection (manual)
+- Send a Chinese sentence to the bot: `__test_小明每天早上都会去公园跑步。`
+- Verify bot replies with "Extracting words from sentence..." (or Chinese equivalent)
+- Verify bot shows extracted words with "From your sentence..." message
+- Verify words are queued with source sentence attached
+- Click "Start Now" — verify cards created with pre-filled Main Sentence
+- Verify enrichment skips sentence generation for these cards
+
+### 13h. Telegram — short input NOT sentence (manual)
+- Send a short Chinese word: `__test_跑步`
+- Verify bot treats it as a normal word (queued directly, no extraction)
+
+### 13i. Cleanup
+- Delete all `__test_` notes from both decks:
+  ```
+  curl -s http://localhost:8765 -X POST \
+    -d '{"action":"findNotes","version":6,"params":{"query":"deck:\"Gao Chinese\" __test_*"}}'
+  ```
+  ```
+  curl -s http://localhost:8765 -X POST \
+    -d '{"action":"findNotes","version":6,"params":{"query":"deck:\"Gao English Spelling\" __test_*"}}'
+  ```
+- Delete found note IDs via deleteNotes
+
+---
+
 ## Notes
 
 - Test words use `__test_` prefix for easy identification and cleanup
