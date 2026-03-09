@@ -87,15 +87,24 @@ export default function QuickAddPage() {
   const [wordSentences, setWordSentences] = useState<Map<string, string>>(new Map());
 
   // Split by newlines first, then conditionally split non-sentence lines by commas.
-  // Lines ending with sentence punctuation are kept whole so Chinese commas within
-  // sentences (e.g. "孕妇被困在车里，没办法出来。") are not treated as delimiters.
+  // A line is kept whole (not split by commas) when it looks like a sentence:
+  //   1. Ends with sentence punctuation (。！？!?.)
+  //   2. Chinese line with commas where any part has >3 CJK chars (clause, not word)
+  // Otherwise commas/、are treated as word delimiters.
   const words = wordsInput
     .split(/\n/)
     .map((line) => line.trim())
     .filter(Boolean)
     .flatMap((line) => {
+      // Sentence punctuation at end → keep whole
       if (/[。！？!?]$/.test(line) || (/\.\s*$/.test(line) && line.split(/\s+/).length > 2)) {
         return [line];
+      }
+      // Chinese with commas: if any part has >3 CJK chars, it's clauses not words
+      if (/[，、]/.test(line) && /[\u4e00-\u9fff]/.test(line)) {
+        const parts = line.split(/[，、]/).map((p) => p.trim()).filter(Boolean);
+        const hasClauses = parts.some((p) => (p.match(/[\u4e00-\u9fff]/g) || []).length > 3);
+        if (hasClauses) return [line];
       }
       return line.split(/[,，、]/).map((w) => w.trim()).filter(Boolean);
     });
@@ -119,6 +128,11 @@ export default function QuickAddPage() {
       .flatMap((line) => {
         if (/[。！？!?]$/.test(line) || (/\.\s*$/.test(line) && line.split(/\s+/).length > 2)) {
           return [line];
+        }
+        if (/[，、]/.test(line) && /[\u4e00-\u9fff]/.test(line)) {
+          const parts = line.split(/[，、]/).map((p) => p.trim()).filter(Boolean);
+          const hasClauses = parts.some((p) => (p.match(/[\u4e00-\u9fff]/g) || []).length > 3);
+          if (hasClauses) return [line];
         }
         return line.split(/[,，、]/).map((w) => w.trim()).filter(Boolean);
       });
