@@ -476,8 +476,11 @@ export async function batchEnrichText(
 
     try {
       const prompt = buildBatchPrompt(chunk, enrichFields, language);
+      console.log(`[batchEnrichText] Chunk ${ci + 1}/${chunks.length}: requesting fields [${enrichFields.join(", ")}] for ${chunk.length} words`);
       const rawText = await runAI(prompt);
+      console.log(`[batchEnrichText] Raw AI response (first 500 chars): ${rawText.slice(0, 500)}`);
       const parsed = extractJsonArray(rawText);
+      console.log(`[batchEnrichText] Parsed ${parsed.length} objects, keys: ${parsed[0] ? Object.keys(parsed[0]).join(", ") : "none"}`);
 
       for (let i = 0; i < chunk.length; i++) {
         const card = chunk[i];
@@ -489,6 +492,12 @@ export async function batchEnrichText(
           );
 
         if (result) {
+          const hasFields = ["definition", "phonetic", "synonyms", "extra_info"].some(
+            (f) => result[f] !== undefined && result[f] !== null && result[f] !== ""
+          );
+          if (!hasFields) {
+            console.warn(`[batchEnrichText] Word "${card.word}": AI returned object but no enrichment fields. Keys: ${Object.keys(result).join(", ")}`);
+          }
           allResults.push({
             noteId: card.noteId,
             word: card.word,
@@ -753,22 +762,24 @@ export async function runFullPipeline(
   // 4. Save text to Anki
   await progress.update(`[${language.label}] Saving text to Anki...`);
   for (const result of enrichResults) {
-    if (!result.error) {
-      try {
-        // Don't overwrite pre-filled source sentence with AI-generated one
-        const sourceItem = created.find((x) => x.noteId === result.noteId);
-        const resultToSave = sourceItem?.sentence
-          ? { ...result, sentence: undefined }
-          : result;
-        await saveTextToAnki(resultToSave.noteId, resultToSave.word, resultToSave, language);
-        // Update sentence in created array for downstream audio/image generation
-        if (result.sentence) {
-          const c = created.find((x) => x.noteId === result.noteId);
-          if (c && !c.sentence) c.sentence = result.sentence;
-        }
-      } catch (err) {
-        errors.push(`Save text for "${result.word}": ${err instanceof Error ? err.message : String(err)}`);
+    if (result.error) {
+      errors.push(`Enrich "${result.word}": ${result.error}`);
+      continue;
+    }
+    try {
+      // Don't overwrite pre-filled source sentence with AI-generated one
+      const sourceItem = created.find((x) => x.noteId === result.noteId);
+      const resultToSave = sourceItem?.sentence
+        ? { ...result, sentence: undefined }
+        : result;
+      await saveTextToAnki(resultToSave.noteId, resultToSave.word, resultToSave, language);
+      // Update sentence in created array for downstream audio/image generation
+      if (result.sentence) {
+        const c = created.find((x) => x.noteId === result.noteId);
+        if (c && !c.sentence) c.sentence = result.sentence;
       }
+    } catch (err) {
+      errors.push(`Save text for "${result.word}": ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 
@@ -954,22 +965,24 @@ export async function runFullPipelineFromExtraction(
   // 4. Save text to Anki
   await progress.update(`[${language.label}] Saving text to Anki...`);
   for (const result of enrichResults) {
-    if (!result.error) {
-      try {
-        // Don't overwrite pre-filled source sentence with AI-generated one
-        const sourceItem = created.find((x) => x.noteId === result.noteId);
-        const resultToSave = sourceItem?.sentence
-          ? { ...result, sentence: undefined }
-          : result;
-        await saveTextToAnki(resultToSave.noteId, resultToSave.word, resultToSave, language);
-        // Update sentence in created array for downstream audio/image generation
-        if (result.sentence) {
-          const c = created.find((x) => x.noteId === result.noteId);
-          if (c && !c.sentence) c.sentence = result.sentence;
-        }
-      } catch (err) {
-        errors.push(`Save text for "${result.word}": ${err instanceof Error ? err.message : String(err)}`);
+    if (result.error) {
+      errors.push(`Enrich "${result.word}": ${result.error}`);
+      continue;
+    }
+    try {
+      // Don't overwrite pre-filled source sentence with AI-generated one
+      const sourceItem = created.find((x) => x.noteId === result.noteId);
+      const resultToSave = sourceItem?.sentence
+        ? { ...result, sentence: undefined }
+        : result;
+      await saveTextToAnki(resultToSave.noteId, resultToSave.word, resultToSave, language);
+      // Update sentence in created array for downstream audio/image generation
+      if (result.sentence) {
+        const c = created.find((x) => x.noteId === result.noteId);
+        if (c && !c.sentence) c.sentence = result.sentence;
       }
+    } catch (err) {
+      errors.push(`Save text for "${result.word}": ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 

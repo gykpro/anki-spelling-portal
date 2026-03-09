@@ -32,6 +32,8 @@ export function runClaude(prompt: string, options?: {
     }
 
     const spawnEnv: NodeJS.ProcessEnv = { ...process.env, FORCE_COLOR: "0" };
+    // Allow spawning claude as a subprocess even when called from within Claude Code
+    delete spawnEnv.CLAUDECODE;
     const oauthToken = getConfig("CLAUDE_CODE_OAUTH_TOKEN");
     if (oauthToken) {
       spawnEnv["CLAUDE_CODE_OAUTH_TOKEN"] = oauthToken;
