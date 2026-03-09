@@ -86,10 +86,19 @@ export default function QuickAddPage() {
   // Map from extracted word (lowercased) to its source sentence
   const [wordSentences, setWordSentences] = useState<Map<string, string>>(new Map());
 
+  // Split by newlines first, then conditionally split non-sentence lines by commas.
+  // Lines ending with sentence punctuation are kept whole so Chinese commas within
+  // sentences (e.g. "孕妇被困在车里，没办法出来。") are not treated as delimiters.
   const words = wordsInput
-    .split(/[,，、\n]/)
-    .map((w) => w.trim())
-    .filter(Boolean);
+    .split(/\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .flatMap((line) => {
+      if (/[。！？!?]$/.test(line) || (/\.\s*$/.test(line) && line.split(/\s+/).length > 2)) {
+        return [line];
+      }
+      return line.split(/[,，、]/).map((w) => w.trim()).filter(Boolean);
+    });
 
   const wordsToAdd = words.filter((w) => !skippedWords.has(w.toLowerCase()));
 
@@ -102,8 +111,17 @@ export default function QuickAddPage() {
   const checkAndSubmit = useCallback(async () => {
     if (words.length === 0) return;
 
-    // Check for sentences in the input
-    const inputLines = wordsInput.split(/[,，、\n]/).map(w => w.trim()).filter(Boolean);
+    // Check for sentences in the input — use same smart splitting as `words`
+    const inputLines = wordsInput
+      .split(/\n/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .flatMap((line) => {
+        if (/[。！？!?]$/.test(line) || (/\.\s*$/.test(line) && line.split(/\s+/).length > 2)) {
+          return [line];
+        }
+        return line.split(/[,，、]/).map((w) => w.trim()).filter(Boolean);
+      });
     const sentences = inputLines.filter(line => isSentenceInput(line));
 
     if (sentences.length > 0 && !sentenceSource) {
