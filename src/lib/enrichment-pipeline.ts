@@ -829,6 +829,22 @@ export async function runFullPipeline(
     }
   }
 
+  // 6b. Generate stroke order GIFs (Chinese only, driven by language config)
+  if (language.extraMediaSteps.includes("strokeOrder")) {
+    for (let i = 0; i < created.length; i++) {
+      const c = created[i];
+      await progress.update(
+        `[${language.label}] Stroke order ${i + 1}/${created.length}: ${c.word}`
+      );
+      try {
+        const mediaFiles = await generateAndSaveStrokeOrder(c.noteId, c.word);
+        for (const mf of mediaFiles) mediaCache.set(mf.filename, mf.data);
+      } catch (err) {
+        errors.push(`Stroke order for "${c.word}": ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+  }
+
   // 7. Distribute to target profiles (with media)
   const allNoteIds = created.map((c) => c.noteId);
   try {
@@ -1012,6 +1028,22 @@ export async function runFullPipelineFromExtraction(
       for (const mf of mediaFiles) mediaCache.set(mf.filename, mf.data);
     } catch (err) {
       errors.push(`Image for "${c.word}": ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  // 6b. Generate stroke order GIFs (Chinese only, driven by language config)
+  if (language.extraMediaSteps.includes("strokeOrder")) {
+    for (let i = 0; i < created.length; i++) {
+      const c = created[i];
+      await progress.update(
+        `[${language.label}] Stroke order ${i + 1}/${created.length}: ${c.word}`
+      );
+      try {
+        const mediaFiles = await generateAndSaveStrokeOrder(c.noteId, c.word);
+        for (const mf of mediaFiles) mediaCache.set(mf.filename, mf.data);
+      } catch (err) {
+        errors.push(`Stroke order for "${c.word}": ${err instanceof Error ? err.message : String(err)}`);
+      }
     }
   }
 
