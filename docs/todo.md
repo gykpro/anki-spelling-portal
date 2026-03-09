@@ -13,6 +13,7 @@
 ## In Progress
 
 ## Pending
+- [ ] **Refactor: Unify Pipeline Functions** — `runFullPipeline` and `runFullPipelineFromExtraction` share ~90% code. Merge into a single function to prevent missed steps when adding new pipeline stages (e.g. stroke order was missing from Telegram pipeline). Use `LanguageConfig.extraMediaSteps` as the driver for language-specific steps.
 
 ## Recently Completed
 - [x] **Sentence-to-Words Extraction** — Detect sentence input (Chinese >5 chars, English >3 words, or punctuation), extract 1-3 key vocabulary words via AI, create cards with original sentence pre-filled as Main Sentence. Works in both Telegram bot and Portal Quick Add. Enrichment skips sentence generation for cards with pre-filled sentences.
