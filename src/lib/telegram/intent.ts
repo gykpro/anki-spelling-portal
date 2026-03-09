@@ -23,6 +23,26 @@ export function detectIntent(text: string): Intent {
   // Detect language from text content
   const lang = detectLanguage(trimmed);
 
+  // Check if the full text is a sentence BEFORE splitting by commas.
+  // For Chinese text with commas, distinguish sentences from word lists:
+  //   "元旦夜了，大家喜迎新年，开心极了" → sentence (clauses with >3 CJK chars)
+  //   "苹果，香蕉，樱桃" → word list (parts ≤3 CJK chars each)
+  if (isSentenceInput(trimmed)) {
+    const hasCommas = /[，、,]/.test(trimmed);
+    const hasCJK = CJK_RE.test(trimmed);
+    if (hasCommas && hasCJK) {
+      // Only treat as sentence if at least one comma-separated part is a clause (>3 CJK chars)
+      const commaParts = trimmed.split(/[，、,]/).map((p) => p.trim()).filter(Boolean);
+      const hasClauses = commaParts.some((p) => (p.match(/[\u4e00-\u9fff]/g) || []).length > 3);
+      if (hasClauses) {
+        return { type: "sentence", sentence: trimmed, lang };
+      }
+      // Otherwise fall through to word_list splitting
+    } else {
+      return { type: "sentence", sentence: trimmed, lang };
+    }
+  }
+
   // Split by newlines, commas, semicolons, or Chinese enumeration comma
   const parts = trimmed
     .split(/[\n,;、，]+/)
@@ -31,11 +51,6 @@ export function detectIntent(text: string): Intent {
 
   if (parts.length > 1) {
     return { type: "word_list", words: parts, lang };
-  }
-
-  // Check if single input is a sentence
-  if (parts.length === 1 && isSentenceInput(trimmed)) {
-    return { type: "sentence", sentence: trimmed, lang };
   }
 
   // Single entry: for English, >5 words is probably a question/message.
