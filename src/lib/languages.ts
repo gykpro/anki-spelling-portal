@@ -38,9 +38,7 @@ const CHINESE: LanguageConfig = {
   },
   enrichFields: [
     "sentence",
-    "definition",
     "phonetic",
-    "synonyms",
     "extra_info",
     "sentencePinyin",
   ],
