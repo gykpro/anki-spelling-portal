@@ -55,31 +55,33 @@ function getEnrichableFields(note: AnkiNote) {
   const sentence = getFieldValue(note, "Main Sentence");
   const hasSentence = !!sentence;
   const chinese = isChinese(note);
+  const lang = getLanguageByNoteType(note.modelName) ?? getLanguageById(chinese ? "chinese" : "english");
+  const enrichFieldSet = new Set(lang.enrichFields);
 
   const fields: Record<EnrichField, { available: boolean; filled: boolean; label: string }> = {
-    sentence: { available: true, filled: hasSentence, label: "Sentence" },
+    sentence: { available: enrichFieldSet.has("sentence"), filled: hasSentence, label: "Sentence" },
     definition: {
-      available: true,
+      available: enrichFieldSet.has("definition"),
       filled: !!getFieldValue(note, "Definition"),
       label: "Definition",
     },
     phonetic: {
-      available: true,
+      available: enrichFieldSet.has("phonetic"),
       filled: !!getFieldValue(note, "Phonetic symbol"),
       label: chinese ? "Pinyin" : "Phonetic",
     },
     synonyms: {
-      available: true,
+      available: enrichFieldSet.has("synonyms"),
       filled: !!getFieldValue(note, "Synonyms"),
       label: "Synonyms",
     },
     extra_info: {
-      available: true,
+      available: enrichFieldSet.has("extra_info"),
       filled: !!getFieldValue(note, "Extra information"),
       label: "Extra Examples",
     },
     sentencePinyin: {
-      available: chinese,
+      available: enrichFieldSet.has("sentencePinyin"),
       filled: !!getFieldValue(note, "Main Sentence Pinyin"),
       label: "Sentence Pinyin",
     },
@@ -99,7 +101,7 @@ function getEnrichableFields(note: AnkiNote) {
       label: "Sentence Audio",
     },
     strokeOrder: {
-      available: chinese,
+      available: lang.extraMediaSteps.includes("strokeOrder"),
       filled: !!getFieldValue(note, "Stroke Order Anim"),
       label: "Stroke Order",
     },
