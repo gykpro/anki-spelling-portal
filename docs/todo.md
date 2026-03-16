@@ -13,9 +13,9 @@
 ## In Progress
 
 ## Pending
-- [ ] **Refactor: Unify Pipeline & Language-Driven Field Config** — `runFullPipeline` and `runFullPipelineFromExtraction` share ~90% code. Merge into a single function to prevent missed steps when adding new pipeline stages (e.g. stroke order was missing from Telegram pipeline). Also: `LanguageConfig` should be the single source of truth for which fields to enrich, which media steps to run, and which fields exist on the note type — currently `enrichFields` lists fields to generate but doesn't distinguish "exists on note type" from "should be auto-generated". Concrete issue: Chinese cards don't need "definition" field enriched but it's still in `CHINESE.enrichFields`.
 
 ## Recently Completed
+- [x] **Pipeline Unification & Language-Driven Field Config** — Merged `runFullPipeline` and `runFullPipelineFromExtraction` into single `runPipeline()`. `LanguageConfig.enrichFields` is now the single source of truth — card-completeness, Enrich page, and batch enrichment all read from it. Removed definition and synonyms from Chinese enrichment. Dev server port changed to 3001.
 - [x] **Sentence-to-Words Extraction** — Detect sentence input (Chinese >5 chars, English >3 words, or punctuation), extract 1-3 key vocabulary words via AI, create cards with original sentence pre-filled as Main Sentence. Works in both Telegram bot and Portal Quick Add. Enrichment skips sentence generation for cards with pre-filled sentences.
 - [x] **Word Detail Drawer** — Click any word on Browse page to open a slide-out drawer showing all card fields grouped into sections (Core, Phonetics, Extended, Media). Shows field fill status with checkmarks, stroke order partial completeness indicator, and quick Enrich link. Closes via X, Escape, or click-outside.
 - [x] **Fix: Save All Progress + Navigation Guard** — Save All now shows a prominent progress banner with progress bar and card counter. Navigation guard (`beforeunload`) prevents accidental page leave during save or batch enrichment. Banner auto-dismisses after 3 seconds on completion.
