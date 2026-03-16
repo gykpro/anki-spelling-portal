@@ -6,7 +6,8 @@ import { Bot } from "grammy";
 import { getConfig } from "@/lib/settings";
 import { registerHandlers } from "./handlers";
 import { wordQueue } from "./word-queue";
-import { t } from "./i18n";
+import { t, type MsgKey } from "./i18n";
+import { getAllChatIds } from "./user-prefs";
 
 // Persist across HMR in dev
 const globalForBot = globalThis as unknown as {
@@ -24,6 +25,20 @@ function getAllowedUserIds(): Set<number> {
       .filter((s) => s.length > 0)
       .map(Number)
       .filter((n) => !isNaN(n))
+  );
+}
+
+/** Send a localized message to all known users. Best-effort — failures are logged and skipped. */
+async function broadcast(bot: Bot, key: MsgKey): Promise<void> {
+  const chatIds = getAllChatIds();
+  if (chatIds.length === 0) return;
+  console.log(`[Telegram] Broadcasting "${key}" to ${chatIds.length} user(s)`);
+  await Promise.allSettled(
+    chatIds.map((id) =>
+      bot.api.sendMessage(id, t(id, key)).catch((err) => {
+        console.warn(`[Telegram] Failed to notify ${id}: ${err instanceof Error ? err.message : String(err)}`);
+      })
+    )
   );
 }
 
@@ -104,19 +119,24 @@ export async function startTelegramBot(): Promise<void> {
     drop_pending_updates: true,
     onStart: () => {
       console.log("[Telegram] Bot started (long-polling)");
+      // Notify users the service is back online
+      broadcast(bot, "service_back_online").catch(() => {});
     },
   }).catch((err) => {
     console.error(`[Telegram] Polling error: ${err instanceof Error ? err.message : String(err)}`);
     globalForBot.__telegramBotRunning = false;
   });
 
-  // Handle graceful shutdown
-  const onShutdown = () => {
+  // Handle graceful shutdown — notify users before stopping
+  const onShutdown = async () => {
+    if (globalForBot.__telegramBot && globalForBot.__telegramBotRunning) {
+      await broadcast(globalForBot.__telegramBot, "service_shutting_down").catch(() => {});
+    }
     stopTelegramBot();
     process.exit(0);
   };
-  process.once("SIGINT", onShutdown);
-  process.once("SIGTERM", onShutdown);
+  process.once("SIGINT", () => { onShutdown(); });
+  process.once("SIGTERM", () => { onShutdown(); });
 }
 
 export function stopTelegramBot(): void {

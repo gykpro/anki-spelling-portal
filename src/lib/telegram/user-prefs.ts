@@ -51,3 +51,9 @@ export function setUserLang(userId: number, lang: Lang): void {
   prefs[String(userId)] = { lang };
   writePrefs(prefs);
 }
+
+/** Return all known user/chat IDs (for broadcast messages). */
+export function getAllChatIds(): number[] {
+  const prefs = readPrefs();
+  return Object.keys(prefs).map(Number).filter((n) => !isNaN(n));
+}

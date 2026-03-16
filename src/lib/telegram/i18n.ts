@@ -49,7 +49,9 @@ export type MsgKey =
   | "btn_lang_english"
   | "btn_lang_chinese"
   | "extracting_words_from_sentence"
-  | "no_words_extracted";
+  | "no_words_extracted"
+  | "service_shutting_down"
+  | "service_back_online";
 
 const translations: Record<Lang, Record<MsgKey, string>> = {
   english: {
@@ -104,6 +106,8 @@ const translations: Record<Lang, Record<MsgKey, string>> = {
     extracting_words_from_sentence: "Analyzing sentence for key words...",
     no_words_extracted:
       "Could not extract any vocabulary words from that sentence.",
+    service_shutting_down: "🔄 Service is restarting — back shortly!",
+    service_back_online: "✅ Service is back online and ready!",
   },
   chinese: {
     not_authorized: "您无权使用此机器人。",
@@ -155,6 +159,8 @@ const translations: Record<Lang, Record<MsgKey, string>> = {
     btn_lang_chinese: "中文",
     extracting_words_from_sentence: "正在分析句子中的关键词...",
     no_words_extracted: "无法从该句子中提取词汇。",
+    service_shutting_down: "🔄 服务正在重启，请稍候！",
+    service_back_online: "✅ 服务已恢复，随时可用！",
   },
 };
 
