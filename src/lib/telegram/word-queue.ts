@@ -9,7 +9,7 @@
 import type { Api } from "grammy";
 import type { LanguageConfig } from "@/lib/languages";
 import { writeQueue } from "@/lib/write-queue";
-import { runFullPipeline } from "@/lib/enrichment-pipeline";
+import { runPipeline } from "@/lib/enrichment-pipeline";
 import { createApiProgressReporter } from "./progress";
 import { t } from "./i18n";
 
@@ -197,7 +197,7 @@ class WordQueue {
           await progress.update(
             t(chatId, "queue_adding", group.items.length, group.lang.label, group.lang.deck)
           );
-          return runFullPipeline(group.items, progress, group.lang);
+          return runPipeline(group.items, progress, group.lang);
         });
         allResults.push({ lang: group.lang.label, ...result });
       } catch (err) {

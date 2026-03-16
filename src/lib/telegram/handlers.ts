@@ -5,7 +5,7 @@ import type { Bot } from "grammy";
 import { detectIntent } from "./intent";
 import { createProgressReporter } from "./progress";
 import {
-  runFullPipelineFromExtraction,
+  runPipeline,
   extractFromImages,
   extractWordsFromSentence,
 } from "@/lib/enrichment-pipeline";
@@ -331,11 +331,19 @@ export function registerHandlers(bot: Bot): void {
         await progress.update(t(uid, "queued_position", writeQueue.pending));
       }
 
+      const items = pages.flatMap((page) =>
+        page.sentences.map((s) => ({
+          word: s.word,
+          sentence: s.sentence,
+          termWeek: page.termWeek,
+          topic: page.topic,
+        }))
+      );
       const result = await writeQueue.enqueue(async () => {
         await progress.update(
           t(uid, "extracted_processing", totalWords, pages.length)
         );
-        return runFullPipelineFromExtraction(pages, progress);
+        return runPipeline(items, progress);
       });
       await progress.send(formatResult(uid, result));
     } catch (err) {
@@ -417,11 +425,19 @@ export function registerHandlers(bot: Bot): void {
         await progress.update(t(uid, "queued_position", writeQueue.pending));
       }
 
+      const items = pages.flatMap((page) =>
+        page.sentences.map((s) => ({
+          word: s.word,
+          sentence: s.sentence,
+          termWeek: page.termWeek,
+          topic: page.topic,
+        }))
+      );
       const result = await writeQueue.enqueue(async () => {
         await progress.update(
           t(uid, "extracted_processing", totalWords, pages.length)
         );
-        return runFullPipelineFromExtraction(pages, progress);
+        return runPipeline(items, progress);
       });
       await progress.send(formatResult(uid, result));
     } catch (err) {
