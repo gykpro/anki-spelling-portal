@@ -219,21 +219,19 @@ function BrowseContent() {
     });
   };
 
-  const selectAll = () => {
-    const pageStart = (page - 1) * pageSize;
-    const pageNotes = filteredNotes.slice(pageStart, pageStart + pageSize);
-    if (pageNotes.every((n) => selectedIds.has(n.noteId))) {
+  const selectAll = (pageNoteIds: number[]) => {
+    if (pageNoteIds.every((id) => selectedIds.has(id))) {
       // Deselect page notes
       setSelectedIds((prev) => {
         const next = new Set(prev);
-        pageNotes.forEach((n) => next.delete(n.noteId));
+        pageNoteIds.forEach((id) => next.delete(id));
         return next;
       });
     } else {
       // Select page notes
       setSelectedIds((prev) => {
         const next = new Set(prev);
-        pageNotes.forEach((n) => next.add(n.noteId));
+        pageNoteIds.forEach((id) => next.add(id));
         return next;
       });
     }

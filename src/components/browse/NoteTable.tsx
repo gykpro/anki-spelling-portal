@@ -12,7 +12,7 @@ interface NoteTableProps {
   notes: AnkiNote[];
   selectedIds: Set<number>;
   onToggleSelect: (noteId: number) => void;
-  onSelectAll: () => void;
+  onSelectAll: (pageNoteIds: number[]) => void;
   onNoteClick?: (note: AnkiNote) => void;
   page: number;
   pageSize: number;
@@ -160,7 +160,7 @@ export function NoteTable({
                 <input
                   type="checkbox"
                   checked={pageAllSelected}
-                  onChange={onSelectAll}
+                  onChange={() => onSelectAll(paged.map((n) => n.noteId))}
                   className="rounded"
                 />
               </th>
