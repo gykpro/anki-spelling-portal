@@ -7,7 +7,7 @@ import { NoteTable } from "@/components/browse/NoteTable";
 import { NoteDetailDrawer } from "@/components/browse/NoteDetailDrawer";
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
 import { cn } from "@/lib/utils";
-import { getAllLanguages, getLanguageByDeck } from "@/lib/languages";
+import { getAllLanguages, getLanguageByDeck, getLanguageById } from "@/lib/languages";
 import { getCardCompleteness, isStrokeOrderComplete } from "@/lib/card-completeness";
 import type { AnkiNote } from "@/types/anki";
 
@@ -58,7 +58,8 @@ export default function BrowsePage() {
 function BrowseContent() {
   const searchParams = useSearchParams();
   const selectedDeck = searchParams.get("deck") || DEFAULT_DECK;
-  const isChinese = getLanguageByDeck(selectedDeck)?.id === "chinese";
+  const lang = getLanguageByDeck(selectedDeck) ?? getLanguageById("english");
+  const isChinese = lang.id === "chinese";
 
   const [allNotes, setAllNotes] = useState<AnkiNote[]>([]);
   const [total, setTotal] = useState(0);
@@ -151,14 +152,14 @@ function BrowseContent() {
         case "missing_stroke_order":
           return !isStrokeOrderComplete(note.fields);
         case "has_all": {
-          const result = getCardCompleteness(note.fields, !!isChinese);
+          const result = getCardCompleteness(note.fields, lang);
           return result.complete;
         }
         default:
           return true;
       }
     });
-  }, [allNotes, quickFilter, isChinese]);
+  }, [allNotes, quickFilter, lang]);
 
   // Count notes matching each filter for chip badges
   const filterCounts = useMemo(() => {
@@ -182,11 +183,11 @@ function BrowseContent() {
       if (!isStrokeOrderComplete(note.fields)) counts.missing_stroke_order++;
       const hasSentence = !!getFieldValue(note, "Main Sentence");
       if (hasSentence && !getFieldValue(note, "Main Sentence Audio")) counts.missing_sentence_audio++;
-      const result = getCardCompleteness(note.fields, !!isChinese);
+      const result = getCardCompleteness(note.fields, lang);
       if (result.complete) counts.has_all++;
     }
     return counts;
-  }, [allNotes, isChinese]);
+  }, [allNotes, lang]);
 
   // Collect unique tags for display
   const tagCounts = useMemo(() => {

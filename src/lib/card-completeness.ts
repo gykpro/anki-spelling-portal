@@ -3,6 +3,8 @@
  * Determines which enrichable fields are missing for a given card.
  */
 
+import type { LanguageConfig } from "@/lib/languages";
+
 export type FieldCheckKey =
   | "sentence"
   | "definition"
@@ -40,18 +42,28 @@ export interface CardCompleteness {
   missing: FieldCheckKey[];
 }
 
+/** Text field keys that should only be checked if present in lang.enrichFields */
+const TEXT_FIELD_KEYS: Set<FieldCheckKey> = new Set([
+  "sentence", "definition", "phonetic", "synonyms", "extra_info", "sentencePinyin",
+]);
+
 /**
  * Determine which enrichable fields are missing for a card.
  * A card is complete when all applicable fields are filled.
  */
 export function getCardCompleteness(
   fields: Record<string, { value: string }>,
-  isChinese: boolean
+  lang: LanguageConfig
 ): CardCompleteness {
+  const isChinese = lang.id === "chinese";
+  const enrichFieldSet = new Set<string>(lang.enrichFields);
   const hasSentence = !!(fields["Main Sentence"]?.value?.trim());
   const missing: FieldCheckKey[] = [];
 
   for (const check of FIELD_CHECKS) {
+    // Text fields: only check if the language config includes this field
+    if (TEXT_FIELD_KEYS.has(check.key) && !enrichFieldSet.has(check.key)) continue;
+
     // Skip fields that don't apply to this card
     if (check.conditional === "chinese" && !isChinese) continue;
     if (check.conditional === "hasSentence" && !hasSentence) continue;

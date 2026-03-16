@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ankiConnect } from "@/lib/anki-connect";
-import { getAllLanguages, getLanguageByDeck } from "@/lib/languages";
+import { getAllLanguages, getLanguageByDeck, getLanguageById } from "@/lib/languages";
 import { getCardCompleteness } from "@/lib/card-completeness";
 
 export const dynamic = "force-dynamic";
@@ -69,8 +69,7 @@ async function getDeckStats(deck: string) {
   if (total === 0) return emptyStats();
 
   const notes = await ankiConnect.notesInfo(noteIds);
-  const lang = getLanguageByDeck(deck);
-  const isChinese = lang?.id === "chinese";
+  const lang = getLanguageByDeck(deck) ?? getLanguageById("english");
 
   let missingDefinition = 0;
   let missingAudio = 0;
@@ -85,7 +84,7 @@ async function getDeckStats(deck: string) {
   const needsAttentionNoteIds: number[] = [];
 
   for (const note of notes) {
-    const result = getCardCompleteness(note.fields, isChinese);
+    const result = getCardCompleteness(note.fields, lang);
 
     if (!result.complete) {
       needsAttentionNoteIds.push(note.noteId);
