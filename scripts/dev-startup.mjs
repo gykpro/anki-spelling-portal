@@ -137,7 +137,7 @@ async function main() {
   delete env.CLAUDECODE;
 
   const extraArgs = process.argv.slice(2);
-  const child = spawn("npx", ["next", "dev", ...extraArgs], {
+  const child = spawn("npx", ["next", "dev", "--port", "3001", ...extraArgs], {
     stdio: "inherit",
     shell: true,
     env,
