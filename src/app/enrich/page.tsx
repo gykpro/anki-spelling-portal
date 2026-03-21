@@ -105,6 +105,17 @@ function getEnrichableFields(note: AnkiNote) {
       filled: !!getFieldValue(note, "Stroke Order Anim"),
       label: "Stroke Order",
     },
+    extra_info_audio: {
+      available: !!getFieldValue(note, "Extra information"),
+      filled: (() => {
+        const extraInfo = getFieldValue(note, "Extra information");
+        if (!extraInfo) return false;
+        const lis = extraInfo.match(/<li>([\s\S]*?)<\/li>/gi);
+        if (!lis || lis.length === 0) return false;
+        return lis.every((li: string) => /\[sound:[^\]]+\]/.test(li));
+      })(),
+      label: "Example Audio",
+    },
   };
 
   return {
@@ -927,8 +938,37 @@ function EnrichContent() {
       }
     }
 
+    // Second pass: generate extra info audio for cards that have extra info text but no audio
+    const cardsNeedingExtraAudio: { noteId: number; word: string }[] = [];
+    for (const note of notes) {
+      const info = getEnrichableFields(note);
+      if (info.fields.extra_info_audio.available && !info.fields.extra_info_audio.filled) {
+        cardsNeedingExtraAudio.push({ noteId: note.noteId, word: info.word });
+      }
+    }
+
+    for (let i = 0; i < cardsNeedingExtraAudio.length; i++) {
+      const card = cardsNeedingExtraAudio[i];
+      setBatchProgress(`Example audio ${i + 1}/${cardsNeedingExtraAudio.length}: ${card.word}...`);
+
+      try {
+        await fetch("/api/enrich", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            noteId: card.noteId,
+            word: card.word,
+            fields: ["extra_info_audio"],
+          }),
+        });
+      } catch (err) {
+        console.warn(`Extra info audio for "${card.word}" failed:`, err);
+      }
+    }
+
     setBatchProgress(`Audio done for ${cardsNeedingAudio.length} cards`);
     setBatchEnriching(false);
+    if (cardsNeedingExtraAudio.length > 0) fetchNotes();
   };
 
   const generateAllImages = async () => {
@@ -1078,6 +1118,73 @@ function EnrichContent() {
 
     setBatchProgress(`Stroke order done for ${cardsNeedingStroke.length} cards`);
     setBatchEnriching(false);
+  };
+
+  const generateAllExtraInfoAudio = async () => {
+    const cardsNeeding: { noteId: number; word: string }[] = [];
+
+    for (const note of notes) {
+      const info = getEnrichableFields(note);
+      if (info.fields.extra_info_audio.available && !info.fields.extra_info_audio.filled) {
+        cardsNeeding.push({ noteId: note.noteId, word: info.word });
+      }
+    }
+
+    if (cardsNeeding.length === 0) return;
+
+    setBatchEnriching(true);
+    setBatchProgress(`Example audio 0/${cardsNeeding.length}...`);
+
+    setNoteStates((prev) => {
+      const next = { ...prev };
+      for (const c of cardsNeeding) {
+        next[c.noteId] = { ...next[c.noteId], enriching: true, error: null };
+      }
+      return next;
+    });
+
+    for (let i = 0; i < cardsNeeding.length; i++) {
+      const card = cardsNeeding[i];
+      setBatchProgress(`Example audio ${i + 1}/${cardsNeeding.length}: ${card.word}...`);
+
+      try {
+        const res = await fetch("/api/enrich", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            noteId: card.noteId,
+            word: card.word,
+            fields: ["extra_info_audio"],
+          }),
+        });
+
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.error || "Example audio generation failed");
+        }
+
+        setNoteStates((prev) => ({
+          ...prev,
+          [card.noteId]: {
+            ...prev[card.noteId],
+            enriching: false,
+          },
+        }));
+      } catch (err) {
+        setNoteStates((prev) => ({
+          ...prev,
+          [card.noteId]: {
+            ...prev[card.noteId],
+            enriching: false,
+            error: err instanceof Error ? err.message : "Example audio failed",
+          },
+        }));
+      }
+    }
+
+    setBatchProgress(`Example audio done for ${cardsNeeding.length} cards`);
+    setBatchEnriching(false);
+    fetchNotes();
   };
 
   // Auto-enrich pipeline: text → save → audio → save
@@ -1347,6 +1454,12 @@ function EnrichContent() {
     return info.fields.strokeOrder.available && !info.fields.strokeOrder.filled;
   }).length;
 
+  // Count cards with missing extra info audio
+  const cardsWithMissingExtraInfoAudio = notes.filter((note) => {
+    const info = getEnrichableFields(note);
+    return info.fields.extra_info_audio.available && !info.fields.extra_info_audio.filled;
+  }).length;
+
   // Count unsaved results
   const unsavedCount = notes.filter(
     (n) => noteStates[n.noteId]?.results && !noteStates[n.noteId]?.saved
@@ -1454,6 +1567,23 @@ function EnrichContent() {
             {batchEnriching
               ? "Generating..."
               : `Generate All Stroke Order (${cardsWithMissingStrokeOrder})`}
+          </button>
+        )}
+
+        {cardsWithMissingExtraInfoAudio > 0 && (
+          <button
+            onClick={generateAllExtraInfoAudio}
+            disabled={batchEnriching || savingAll || cardsWithMissingExtraInfoAudio === 0}
+            className="inline-flex items-center gap-1.5 rounded-md bg-primary/80 px-4 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-40"
+          >
+            {batchEnriching ? (
+              <LoadingSpinner size="sm" className="text-primary-foreground" />
+            ) : (
+              <Volume2 className="h-3.5 w-3.5" />
+            )}
+            {batchEnriching
+              ? "Generating..."
+              : `Generate Example Audio (${cardsWithMissingExtraInfoAudio})`}
           </button>
         )}
 
