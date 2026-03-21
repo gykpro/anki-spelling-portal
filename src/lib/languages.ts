@@ -7,7 +7,7 @@ export interface LanguageConfig {
   noteType: string;
   tts: { voice: string; lang: string; wordRate: string; sentenceRate: string };
   enrichFields: TextEnrichField[];
-  extraMediaSteps: ("strokeOrder")[];
+  extraMediaSteps: ("strokeOrder" | "extraInfoAudio")[];
 }
 
 const ENGLISH: LanguageConfig = {
@@ -22,7 +22,7 @@ const ENGLISH: LanguageConfig = {
     sentenceRate: "0%",
   },
   enrichFields: ["sentence", "definition", "phonetic", "synonyms", "extra_info"],
-  extraMediaSteps: [],
+  extraMediaSteps: ["extraInfoAudio"],
 };
 
 const CHINESE: LanguageConfig = {
@@ -42,7 +42,7 @@ const CHINESE: LanguageConfig = {
     "extra_info",
     "sentencePinyin",
   ],
-  extraMediaSteps: ["strokeOrder"],
+  extraMediaSteps: ["strokeOrder", "extraInfoAudio"],
 };
 
 const ALL_LANGUAGES: LanguageConfig[] = [ENGLISH, CHINESE];
