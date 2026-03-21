@@ -76,6 +76,14 @@ export function getCardCompleteness(
       continue;
     }
 
+    // Special handling for extra_info: check text + audio completeness
+    if (check.key === "extra_info") {
+      if (!isExtraInfoComplete(fields)) {
+        missing.push(check.key);
+      }
+      continue;
+    }
+
     const value = fields[check.ankiField]?.value?.trim();
     if (!value) {
       missing.push(check.key);
@@ -101,6 +109,22 @@ export function isStrokeOrderComplete(
 
   const imgCount = (strokeValue.match(/<img/g) || []).length;
   return imgCount >= cjkChars.length;
+}
+
+/**
+ * Check if Extra information field has audio in every <li> tag.
+ * Returns true if field is non-empty AND every <li> contains [sound:...].
+ */
+export function isExtraInfoComplete(
+  fields: Record<string, { value: string }>
+): boolean {
+  const value = fields["Extra information"]?.value?.trim();
+  if (!value) return false;
+
+  const liContents = value.match(/<li>([\s\S]*?)<\/li>/gi);
+  if (!liContents || liContents.length === 0) return false;
+
+  return liContents.every((li) => /\[sound:[^\]]+\]/.test(li));
 }
 
 /** Get all field check definitions (for iteration in UI) */
