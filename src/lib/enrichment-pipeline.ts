@@ -931,6 +931,22 @@ export async function runPipeline(
     }
   }
 
+  // 6c. Generate extra info audio (driven by language config)
+  if (language.extraMediaSteps.includes("extraInfoAudio")) {
+    for (let i = 0; i < created.length; i++) {
+      const c = created[i];
+      await progress.update(
+        `[${language.label}] Example audio ${i + 1}/${created.length}: ${c.word}`
+      );
+      try {
+        const mediaFiles = await generateExtraInfoAudio(c.noteId, c.word, language);
+        for (const mf of mediaFiles) mediaCache.set(mf.filename, mf.data);
+      } catch (err) {
+        errors.push(`Example audio for "${c.word}": ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+  }
+
   // 7. Distribute to target profiles (with media)
   const allNoteIds = created.map((c) => c.noteId);
   try {
