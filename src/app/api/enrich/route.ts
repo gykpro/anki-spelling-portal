@@ -8,7 +8,7 @@ import {
   ENRICH_SUFFIX,
   CHINESE_ENRICH_SUFFIX,
 } from "@/lib/enrich-prompts";
-import { generateTTS, generateImage, generateAndSaveStrokeOrder } from "@/lib/enrichment-pipeline";
+import { generateTTS, generateImage, generateAndSaveStrokeOrder, generateExtraInfoAudio } from "@/lib/enrichment-pipeline";
 import { getLanguageByNoteType, type LanguageConfig } from "@/lib/languages";
 
 export type EnrichField =
@@ -21,7 +21,8 @@ export type EnrichField =
   | "image"
   | "audio"
   | "sentence_audio"
-  | "strokeOrder";
+  | "strokeOrder"
+  | "extra_info_audio";
 
 interface EnrichRequest {
   noteId: number;
@@ -92,7 +93,7 @@ export async function POST(request: NextRequest) {
     const results = await writeQueue.enqueue(async () => {
       await ankiConnect.syncBeforeWrite();
 
-      const nonTextFields = new Set(["image", "audio", "sentence_audio", "strokeOrder"]);
+      const nonTextFields = new Set(["image", "audio", "sentence_audio", "strokeOrder", "extra_info_audio"]);
       const textFields = fields.filter((f) => !nonTextFields.has(f));
       const needsImage = fields.includes("image");
       const needsAudio = fields.includes("audio");
@@ -132,6 +133,17 @@ export async function POST(request: NextRequest) {
         } catch (err) {
           r.strokeOrder_error =
             err instanceof Error ? err.message : "Stroke order generation failed";
+        }
+      }
+
+      // Generate extra info audio
+      if (fields.includes("extra_info_audio") && noteId) {
+        try {
+          const extraMedia = await generateExtraInfoAudio(noteId, word, lang);
+          r.extra_info_audio = { count: extraMedia.length };
+        } catch (err) {
+          r.extra_info_audio_error =
+            err instanceof Error ? err.message : "Extra info audio generation failed";
         }
       }
 
