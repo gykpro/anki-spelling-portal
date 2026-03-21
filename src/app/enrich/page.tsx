@@ -690,6 +690,23 @@ function EnrichContent() {
         [noteId]: { ...prev[noteId], saved: true },
       }));
 
+      // Generate extra info audio if extra_info was just saved
+      if (r.extra_info && noteId) {
+        try {
+          await fetch("/api/enrich", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              noteId,
+              word: getFieldValue(note, "Word"),
+              fields: ["extra_info_audio"],
+            }),
+          });
+        } catch {
+          // Best-effort — don't block save
+        }
+      }
+
       // Distribute to target profiles (skip when called from batch save — batch distributes at the end)
       if (!skipRefresh && distTargets.length > 0) {
         distribute([noteId], distTargets, mediaFiles.length > 0 ? mediaFiles : undefined);
