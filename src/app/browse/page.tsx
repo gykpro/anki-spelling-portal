@@ -8,7 +8,7 @@ import { NoteDetailDrawer } from "@/components/browse/NoteDetailDrawer";
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
 import { cn } from "@/lib/utils";
 import { getAllLanguages, getLanguageByDeck, getLanguageById } from "@/lib/languages";
-import { getCardCompleteness, isStrokeOrderComplete } from "@/lib/card-completeness";
+import { getCardCompleteness, isStrokeOrderComplete, isExtraInfoComplete } from "@/lib/card-completeness";
 import type { AnkiNote } from "@/types/anki";
 
 type QuickFilter =
@@ -20,7 +20,8 @@ type QuickFilter =
   | "missing_sentence"
   | "missing_phonetic"
   | "missing_sentence_audio"
-  | "missing_stroke_order";
+  | "missing_stroke_order"
+  | "missing_example_audio";
 
 interface FilterDef {
   key: QuickFilter;
@@ -38,6 +39,7 @@ const QUICK_FILTERS: FilterDef[] = [
   { key: "missing_sentence", label: "No Sentence", row: 2 },
   { key: "missing_phonetic", label: "No Phonetic", row: 2 },
   { key: "missing_sentence_audio", label: "No Sentence Audio", row: 2 },
+  { key: "missing_example_audio", label: "No Example Audio", row: 2 },
   { key: "missing_stroke_order", label: "No Stroke Order", row: 2, chineseOnly: true },
 ];
 
@@ -149,6 +151,8 @@ function BrowseContent() {
           const hasSentenceAudio = !!getFieldValue(note, "Main Sentence Audio");
           return hasSentence && !hasSentenceAudio;
         }
+        case "missing_example_audio":
+          return !isExtraInfoComplete(note.fields);
         case "missing_stroke_order":
           return !isStrokeOrderComplete(note.fields);
         case "has_all": {
@@ -171,6 +175,7 @@ function BrowseContent() {
       missing_sentence: 0,
       missing_phonetic: 0,
       missing_sentence_audio: 0,
+      missing_example_audio: 0,
       missing_stroke_order: 0,
       has_all: 0,
     };
@@ -180,6 +185,7 @@ function BrowseContent() {
       if (!getFieldValue(note, "Picture")) counts.missing_image++;
       if (!getFieldValue(note, "Main Sentence")) counts.missing_sentence++;
       if (!getFieldValue(note, "Phonetic symbol")) counts.missing_phonetic++;
+      if (!isExtraInfoComplete(note.fields)) counts.missing_example_audio++;
       if (!isStrokeOrderComplete(note.fields)) counts.missing_stroke_order++;
       const hasSentence = !!getFieldValue(note, "Main Sentence");
       if (hasSentence && !getFieldValue(note, "Main Sentence Audio")) counts.missing_sentence_audio++;
