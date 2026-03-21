@@ -696,6 +696,84 @@ export async function generateAndSaveStrokeOrder(
   return mediaFiles;
 }
 
+/** Parse <li> contents from HTML extra info field */
+function parseExtraInfoSentences(html: string): { index: number; text: string; hasAudio: boolean }[] {
+  const results: { index: number; text: string; hasAudio: boolean }[] = [];
+  const liRegex = /<li>([\s\S]*?)<\/li>/gi;
+  let match;
+  let idx = 0;
+  while ((match = liRegex.exec(html)) !== null) {
+    const content = match[1];
+    const hasAudio = /\[sound:[^\]]+\]/.test(content);
+    const text = content
+      .replace(/\[sound:[^\]]+\]\s*/g, "")
+      .replace(/<[^>]*>/g, "")
+      .trim();
+    results.push({ index: idx, text, hasAudio });
+    idx++;
+  }
+  return results;
+}
+
+/** Generate and save TTS audio for each example sentence in Extra information.
+ *  Idempotent — skips sentences that already have [sound:...].
+ *  Returns generated media files for distribution. */
+export async function generateExtraInfoAudio(
+  noteId: number,
+  word: string,
+  lang?: LanguageConfig,
+  ankiConnectClient?: typeof ankiConnect
+): Promise<MediaFile[]> {
+  const ac = ankiConnectClient ?? ankiConnect;
+  const language = lang ?? getLanguageById("english");
+  const mediaFiles: MediaFile[] = [];
+
+  const notesInfo = await ac.notesInfo([noteId]);
+  if (notesInfo.length === 0) return mediaFiles;
+  const extraInfo = notesInfo[0].fields?.["Extra information"]?.value || "";
+  if (!extraInfo) return mediaFiles;
+
+  const sentences = parseExtraInfoSentences(extraInfo);
+  if (sentences.length === 0) return mediaFiles;
+
+  const needsAudio = sentences.filter((s) => !s.hasAudio && s.text);
+  if (needsAudio.length === 0) return mediaFiles;
+
+  const safeWord = word.replace(/[^a-zA-Z0-9\u4e00-\u9fff]/g, "_");
+
+  let updatedHtml = extraInfo;
+  for (const s of needsAudio) {
+    try {
+      const tts = await generateTTS(s.text, "sentence", language);
+      const filename = `spelling_extra_${safeWord}_${noteId}_${s.index}.mp3`;
+      await ac.storeMediaFile(filename, tts.base64);
+      mediaFiles.push({ filename, data: tts.base64 });
+
+      // Prepend [sound:filename]\n inside the <li> tag for this sentence
+      const escapedText = s.text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const liPattern = new RegExp(
+        `(<li>)(\\s*)(${escapedText})`,
+        "i"
+      );
+      updatedHtml = updatedHtml.replace(
+        liPattern,
+        `$1[sound:${filename}]\n $3`
+      );
+    } catch (err) {
+      console.warn(`[ExtraInfoAudio] Failed for "${word}" sentence ${s.index}: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  if (mediaFiles.length > 0) {
+    await ac.updateNoteFields({
+      id: noteId,
+      fields: { "Extra information": updatedHtml },
+    });
+  }
+
+  return mediaFiles;
+}
+
 /** Run the full enrichment pipeline for a list of items */
 export async function runPipeline(
   items: PipelineItem[],
