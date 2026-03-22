@@ -18,6 +18,7 @@ services:
     # Or use the pre-built image from Docker Hub instead of building locally:
     # image: gykpro/anki-spelling-portal:latest
     container_name: spelling-portal
+    init: true
     environment:
       ANKI_CONNECT_URL: http://anki:8765
     volumes:

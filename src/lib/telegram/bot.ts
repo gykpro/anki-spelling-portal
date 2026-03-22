@@ -128,15 +128,23 @@ export async function startTelegramBot(): Promise<void> {
   });
 
   // Handle graceful shutdown — notify users before stopping
-  const onShutdown = async () => {
-    if (globalForBot.__telegramBot && globalForBot.__telegramBotRunning) {
-      await broadcast(globalForBot.__telegramBot, "service_shutting_down").catch(() => {});
-    }
-    stopTelegramBot();
-    process.exit(0);
+  const onShutdown = (signal: string) => {
+    console.log(`[Telegram] Received ${signal}, shutting down...`);
+    const doShutdown = async () => {
+      if (globalForBot.__telegramBot && globalForBot.__telegramBotRunning) {
+        console.log("[Telegram] Broadcasting shutdown notification...");
+        await broadcast(globalForBot.__telegramBot, "service_shutting_down").catch((err) => {
+          console.error("[Telegram] Shutdown broadcast failed:", err);
+        });
+        console.log("[Telegram] Shutdown broadcast complete");
+      }
+      stopTelegramBot();
+      process.exit(0);
+    };
+    doShutdown().catch(() => process.exit(1));
   };
-  process.once("SIGINT", () => { onShutdown(); });
-  process.once("SIGTERM", () => { onShutdown(); });
+  process.once("SIGINT", () => onShutdown("SIGINT"));
+  process.once("SIGTERM", () => onShutdown("SIGTERM"));
 }
 
 export function stopTelegramBot(): void {
