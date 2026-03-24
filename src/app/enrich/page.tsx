@@ -431,6 +431,7 @@ function EnrichContent() {
   distTargetsRef.current = distTargets;
   const [distResults, setDistResults] = useState<DistributeResult[] | null>(null);
   const [distributing, setDistributing] = useState(false);
+  const [showSuspended, setShowSuspended] = useState(false);
 
   const distribute = useCallback(async (noteIds: number[], targets: string[], mediaFiles?: { filename: string; data: string }[]) => {
     if (noteIds.length === 0 || targets.length === 0) return;
@@ -464,11 +465,12 @@ function EnrichContent() {
       let url: string;
       if (noteIdsParam) {
         const ids = noteIdsParam.split(",");
-        url = `/api/anki/notes?q=${encodeURIComponent(
-          ids.map((id) => `nid:${id}`).join(" OR ")
-        )}&limit=100`;
+        let q = ids.map((id) => `nid:${id}`).join(" OR ");
+        if (!showSuspended) q += " -is:suspended";
+        url = `/api/anki/notes?q=${encodeURIComponent(q)}&limit=100`;
       } else {
-        url = `/api/anki/notes?limit=100`;
+        const q = showSuspended ? "" : "-is:suspended";
+        url = `/api/anki/notes?limit=100${q ? `&q=${encodeURIComponent(q)}` : ""}`;
       }
       const res = await fetch(url);
       const data = await res.json();
@@ -493,7 +495,7 @@ function EnrichContent() {
     } finally {
       setLoading(false);
     }
-  }, [searchParams]);
+  }, [searchParams, showSuspended]);
 
   useEffect(() => {
     fetchNotes();
@@ -1502,9 +1504,20 @@ function EnrichContent() {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">
-          {notes.length} cards loaded
-        </p>
+        <div className="flex items-center gap-4">
+          <p className="text-sm text-muted-foreground">
+            {notes.length} cards loaded
+          </p>
+          <label className="inline-flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={showSuspended}
+              onChange={(e) => setShowSuspended(e.target.checked)}
+              className="rounded"
+            />
+            Show Suspended
+          </label>
+        </div>
         <button
           onClick={fetchNotes}
           disabled={batchEnriching || savingAll}

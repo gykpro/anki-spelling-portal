@@ -77,13 +77,15 @@ function BrowseContent() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [selectedNote, setSelectedNote] = useState<AnkiNote | null>(null);
+  const [showSuspended, setShowSuspended] = useState(false);
 
   const fetchNotes = useCallback(async (query?: string) => {
     setLoading(true);
     try {
-      const q = query
+      let q = query
         ? `deck:"${selectedDeck}" ${query}`
         : `deck:"${selectedDeck}"`;
+      if (!showSuspended) q += " -is:suspended";
       const res = await fetch(
         `/api/anki/notes?q=${encodeURIComponent(q)}&limit=2000`
       );
@@ -114,7 +116,7 @@ function BrowseContent() {
     } finally {
       setLoading(false);
     }
-  }, [selectedDeck]);
+  }, [selectedDeck, showSuspended]);
 
   useEffect(() => {
     fetchNotes();
@@ -347,6 +349,16 @@ function BrowseContent() {
                 </span>
               </button>
             ))}
+            <span className="mx-1 text-border">|</span>
+            <label className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground/80 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={showSuspended}
+                onChange={(e) => setShowSuspended(e.target.checked)}
+                className="rounded"
+              />
+              Show Suspended
+            </label>
           </div>
         )}
       </div>
