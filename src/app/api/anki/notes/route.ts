@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ankiConnect } from "@/lib/anki-connect";
+import { ankiConnect, withProfileLock } from "@/lib/anki-connect";
 import { writeQueue } from "@/lib/write-queue";
-import type { CreateNoteParams } from "@/types/anki";
-import { getLanguageById } from "@/lib/languages";
+import type { CreateNoteParams, DistributeResult } from "@/types/anki";
+import { getLanguageById, getLanguageByNoteType } from "@/lib/languages";
+import { getConfig } from "@/lib/settings";
 
 /** GET: Search for notes in a spelling deck */
 export async function GET(request: NextRequest) {
@@ -51,6 +52,111 @@ export async function GET(request: NextRequest) {
       {
         error:
           error instanceof Error ? error.message : "Failed to search notes",
+      },
+      { status: 500 }
+    );
+  }
+}
+
+/** DELETE: Delete notes from all profiles by Note ID */
+export async function DELETE(request: NextRequest) {
+  try {
+    const { noteIds } = await request.json();
+
+    if (!noteIds?.length) {
+      return NextResponse.json(
+        { error: "noteIds is required" },
+        { status: 400 }
+      );
+    }
+
+    const result = await writeQueue.enqueue(async () => {
+      await ankiConnect.syncBeforeWrite();
+
+      // Fetch source notes to get "Note ID" UUIDs before deleting
+      const sourceNotes = await ankiConnect.notesInfo(noteIds);
+      if (sourceNotes.length === 0) {
+        throw new Error("No notes found for the given IDs");
+      }
+
+      // Collect UUIDs and detect language for deck lookup
+      const uuids: string[] = [];
+      for (const note of sourceNotes) {
+        const uuid = note.fields["Note ID"]?.value;
+        if (uuid) uuids.push(uuid);
+      }
+
+      const firstNote = sourceNotes[0];
+      const lang = getLanguageByNoteType(firstNote.modelName);
+      const deckName = lang?.deck ?? firstNote.modelName;
+
+      // Delete from home profile
+      await ankiConnect.deleteNotes(noteIds);
+      const homeDeleted = noteIds.length;
+
+      // Delete from target profiles
+      const homeProfile = getConfig("ACTIVE_PROFILE");
+      const distProfilesStr = getConfig("DISTRIBUTION_PROFILES");
+      const targetProfiles = distProfilesStr
+        ? distProfilesStr.split(",").map((p) => p.trim()).filter(Boolean)
+        : [];
+
+      const profileResults: DistributeResult[] = [];
+
+      if (homeProfile && uuids.length > 0) {
+        for (const targetProfile of targetProfiles) {
+          if (targetProfile === homeProfile) continue;
+
+          const profileResult = await withProfileLock(async () => {
+            try {
+              await ankiConnect.loadProfileAndWait(targetProfile);
+
+              let deleted = 0;
+              for (const uuid of uuids) {
+                const found = await ankiConnect.findNotes(
+                  `deck:"${deckName}" "${uuid}"`
+                );
+                if (found.length > 0) {
+                  await ankiConnect.deleteNotes(found);
+                  deleted += found.length;
+                }
+              }
+
+              await ankiConnect.loadProfileAndWait(homeProfile);
+
+              return {
+                profile: targetProfile,
+                success: true,
+                notesDistributed: deleted,
+              };
+            } catch (err) {
+              try {
+                await ankiConnect.loadProfileAndWait(homeProfile);
+              } catch { /* ignore */ }
+
+              return {
+                profile: targetProfile,
+                success: false,
+                error: err instanceof Error ? err.message : "Deletion failed",
+                notesDistributed: 0,
+              };
+            }
+          });
+
+          profileResults.push(profileResult);
+        }
+      }
+
+      return { homeDeleted, profileResults };
+    });
+
+    return NextResponse.json(result);
+  } catch (error) {
+    console.error("Delete notes error:", error);
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error ? error.message : "Failed to delete notes",
       },
       { status: 500 }
     );

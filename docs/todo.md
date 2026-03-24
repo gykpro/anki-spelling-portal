@@ -13,8 +13,11 @@
 ## In Progress
 
 ## Pending
+- [ ] **NoteDetailDrawer Media Preview** — Fix broken images and add audio playback in the word detail drawer. Serve Anki media files via API endpoint.
 
 ## Recently Completed
+- [x] **Delete Notes Across Profiles** — Delete selected notes from all profiles using Note ID field for cross-profile matching. Bulk delete from Browse page with confirmation modal.
+- [x] **Clear Enrichment Fields** — Clear selected enrichment fields on cards to allow re-enrichment. Field picker UI with language-aware checkboxes, auto-clears dependent fields.
 - [x] **Pipeline Unification & Language-Driven Field Config** — Merged `runFullPipeline` and `runFullPipelineFromExtraction` into single `runPipeline()`. `LanguageConfig.enrichFields` is now the single source of truth — card-completeness, Enrich page, and batch enrichment all read from it. Removed definition and synonyms from Chinese enrichment. Dev server port changed to 3001.
 - [x] **Sentence-to-Words Extraction** — Detect sentence input (Chinese >5 chars, English >3 words, or punctuation), extract 1-3 key vocabulary words via AI, create cards with original sentence pre-filled as Main Sentence. Works in both Telegram bot and Portal Quick Add. Enrichment skips sentence generation for cards with pre-filled sentences.
 - [x] **Word Detail Drawer** — Click any word on Browse page to open a slide-out drawer showing all card fields grouped into sections (Core, Phonetics, Extended, Media). Shows field fill status with checkmarks, stroke order partial completeness indicator, and quick Enrich link. Closes via X, Escape, or click-outside.

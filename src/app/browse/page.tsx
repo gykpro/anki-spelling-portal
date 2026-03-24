@@ -2,9 +2,11 @@
 
 import { Suspense, useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useSearchParams } from "next/navigation";
-import { Search, RefreshCw, Filter } from "lucide-react";
+import { Search, RefreshCw, Filter, Trash2, Eraser } from "lucide-react";
 import { NoteTable } from "@/components/browse/NoteTable";
 import { NoteDetailDrawer } from "@/components/browse/NoteDetailDrawer";
+import { DeleteConfirmModal } from "@/components/browse/DeleteConfirmModal";
+import { ClearFieldsModal } from "@/components/browse/ClearFieldsModal";
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
 import { cn } from "@/lib/utils";
 import { getAllLanguages, getLanguageByDeck, getLanguageById } from "@/lib/languages";
@@ -78,6 +80,8 @@ function BrowseContent() {
   const [pageSize, setPageSize] = useState(20);
   const [selectedNote, setSelectedNote] = useState<AnkiNote | null>(null);
   const [showSuspended, setShowSuspended] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showClearFieldsModal, setShowClearFieldsModal] = useState(false);
 
   const fetchNotes = useCallback(async (query?: string) => {
     setLoading(true);
@@ -245,6 +249,37 @@ function BrowseContent() {
     }
   };
 
+  const selectedWords = useMemo(() => {
+    return allNotes
+      .filter((n) => selectedIds.has(n.noteId))
+      .map((n) => n.fields.Word?.value || "unknown");
+  }, [allNotes, selectedIds]);
+
+  const handleDelete = async () => {
+    const res = await fetch("/api/anki/notes", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ noteIds: Array.from(selectedIds) }),
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    setShowDeleteModal(false);
+    setSelectedIds(new Set());
+    fetchNotes(search || undefined);
+  };
+
+  const handleClearFields = async (fields: string[]) => {
+    const res = await fetch("/api/anki/notes/clear-fields", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ noteIds: Array.from(selectedIds), fields }),
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    setShowClearFieldsModal(false);
+    fetchNotes(search || undefined);
+  };
+
   const visibleFilters = QUICK_FILTERS.filter(
     (f) => !f.chineseOnly || isChinese
   );
@@ -376,10 +411,24 @@ function BrowseContent() {
             Enrich Selected
           </a>
           <button
+            onClick={() => setShowClearFieldsModal(true)}
+            className="flex items-center gap-1 rounded bg-warning px-3 py-1 text-xs font-medium text-warning-foreground hover:opacity-90"
+          >
+            <Eraser className="h-3 w-3" />
+            Clear Fields
+          </button>
+          <button
+            onClick={() => setShowDeleteModal(true)}
+            className="flex items-center gap-1 rounded bg-destructive px-3 py-1 text-xs font-medium text-destructive-foreground hover:opacity-90"
+          >
+            <Trash2 className="h-3 w-3" />
+            Delete
+          </button>
+          <button
             onClick={() => setSelectedIds(new Set())}
             className="text-xs text-muted-foreground hover:text-foreground"
           >
-            Clear
+            Clear Selection
           </button>
         </div>
       )}
@@ -408,6 +457,25 @@ function BrowseContent() {
         note={selectedNote}
         onClose={() => setSelectedNote(null)}
       />
+
+      {/* Delete confirmation modal */}
+      {showDeleteModal && (
+        <DeleteConfirmModal
+          words={selectedWords}
+          onConfirm={handleDelete}
+          onCancel={() => setShowDeleteModal(false)}
+        />
+      )}
+
+      {/* Clear fields modal */}
+      {showClearFieldsModal && (
+        <ClearFieldsModal
+          noteCount={selectedIds.size}
+          lang={lang}
+          onConfirm={handleClearFields}
+          onCancel={() => setShowClearFieldsModal(false)}
+        />
+      )}
     </div>
   );
 }
