@@ -13,9 +13,9 @@
 ## In Progress
 
 ## Pending
-- [ ] **NoteDetailDrawer Media Preview** — Fix broken images and add audio playback in the word detail drawer. Serve Anki media files via API endpoint.
 
 ## Recently Completed
+- [x] **NoteDetailDrawer Media Preview** — Fixed broken images and added audio playback in the word detail drawer. Media files served via GET `/api/anki/media` endpoint using AnkiConnect's retrieveMediaFile.
 - [x] **Delete Notes Across Profiles** — Delete selected notes from all profiles using Note ID field for cross-profile matching. Bulk delete from Browse page with confirmation modal.
 - [x] **Clear Enrichment Fields** — Clear selected enrichment fields on cards to allow re-enrichment. Field picker UI with language-aware checkboxes, auto-clears dependent fields.
 - [x] **Pipeline Unification & Language-Driven Field Config** — Merged `runFullPipeline` and `runFullPipelineFromExtraction` into single `runPipeline()`. `LanguageConfig.enrichFields` is now the single source of truth — card-completeness, Enrich page, and batch enrichment all read from it. Removed definition and synonyms from Chinese enrichment. Dev server port changed to 3001.

@@ -18,6 +18,20 @@ function stripHtml(html: string): string {
   return html.replace(/<[^>]*>/g, "");
 }
 
+/** Rewrite img src attributes to serve via the Anki media API */
+function rewriteMediaSrc(html: string): string {
+  return html.replace(
+    /(<img\s[^>]*?)src="([^"]+)"/gi,
+    (_match, prefix, src) => {
+      // Skip already-absolute URLs
+      if (src.startsWith("http://") || src.startsWith("https://") || src.startsWith("/api/")) {
+        return `${prefix}src="${src}"`;
+      }
+      return `${prefix}src="/api/anki/media?filename=${encodeURIComponent(src)}"`;
+    }
+  );
+}
+
 function FieldStatus({ filled }: { filled: boolean }) {
   return filled ? (
     <Check className="h-3.5 w-3.5 text-success shrink-0" />
@@ -76,11 +90,26 @@ function AudioField({ label, value }: { label: string; value: string }) {
         <span className="text-xs font-medium text-muted-foreground">
           {label}
         </span>
-        {filled ? (
+        {filled && filename ? (
+          <div className="mt-1 space-y-1">
+            <div className="flex items-center gap-2">
+              <Volume2 className="h-3.5 w-3.5 text-success shrink-0" />
+              <span className="text-xs text-muted-foreground truncate">
+                {filename}
+              </span>
+            </div>
+            <audio controls preload="none" className="h-8 w-full max-w-xs">
+              <source
+                src={`/api/anki/media?filename=${encodeURIComponent(filename)}`}
+                type="audio/mpeg"
+              />
+            </audio>
+          </div>
+        ) : filled ? (
           <div className="mt-1 flex items-center gap-2">
             <Volume2 className="h-3.5 w-3.5 text-success shrink-0" />
             <span className="text-xs text-muted-foreground truncate">
-              {filename}
+              {value}
             </span>
           </div>
         ) : (
@@ -106,7 +135,7 @@ function ImageField({ label, value }: { label: string; value: string }) {
         {filled ? (
           <div
             className="mt-1 text-xs [&_img]:max-h-24 [&_img]:rounded [&_img]:border [&_img]:border-border"
-            dangerouslySetInnerHTML={{ __html: value }}
+            dangerouslySetInnerHTML={{ __html: rewriteMediaSrc(value) }}
           />
         ) : (
           <p className="mt-0.5 text-xs text-muted-foreground/50 italic">
@@ -139,7 +168,7 @@ function StrokeOrderField({ label, value, word }: { label: string; value: string
         {filled ? (
           <div
             className="mt-1 flex flex-wrap gap-1 [&_img]:h-16 [&_img]:rounded [&_img]:border [&_img]:border-border"
-            dangerouslySetInnerHTML={{ __html: value }}
+            dangerouslySetInnerHTML={{ __html: rewriteMediaSrc(value) }}
           />
         ) : (
           <p className="mt-0.5 text-xs text-muted-foreground/50 italic">

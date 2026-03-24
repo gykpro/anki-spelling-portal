@@ -244,6 +244,14 @@ Before running tests, configure all API keys via the **Settings page** (`/settin
 - Click on a single-character word with stroke order — verify Stroke Order shows green checkmark
 - Click on a multi-character word missing some stroke order GIFs — verify Stroke Order shows "(partial: N/M chars)" warning
 
+### 3h4. Word Detail Drawer — Media preview
+- Click on a word that has audio (Audio field filled)
+- Verify the Audio section shows an audio player control (not just filename text)
+- Click play on the audio player — verify audio plays
+- Verify Main Sentence Audio also has a playable audio control (if filled)
+- Verify the Picture field shows the actual image (not a broken image icon)
+- For Chinese cards with Stroke Order, verify stroke order GIFs render correctly
+
 ### 3h3. Stroke Order filter — partial detection
 - Navigate to Chinese deck, click "No Stroke Order" filter
 - Verify the count includes cards with partial stroke order (fewer `<img>` tags than CJK characters in the word)
