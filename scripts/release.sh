@@ -52,12 +52,7 @@ info "Updating package.json version to $VERSION..."
 npm version "$VERSION" --no-git-tag-version --allow-same-version > /dev/null
 ok "package.json version set to $VERSION"
 
-# --- Step 2: Build Docker image ---
-info "Building Docker image..."
-docker build -t anki-spelling-portal:"v$VERSION" -t anki-spelling-portal:latest . --quiet
-ok "Docker image built: anki-spelling-portal:v$VERSION + :latest"
-
-# --- Step 3: Package skill tarball ---
+# --- Step 2: Package skill tarball ---
 info "Packaging skill tarball..."
 mkdir -p "$RELEASES_DIR"
 
@@ -73,7 +68,7 @@ tar -czf "$RELEASES_DIR/$TARBALL_NAME.tar.gz" -C "$STAGING_DIR" "$TARBALL_NAME"
 rm -rf "$STAGING_DIR"
 ok "Skill tarball: releases/$TARBALL_NAME.tar.gz"
 
-# --- Step 4: Git commit + tag ---
+# --- Step 3: Git commit + tag ---
 info "Creating git commit and tag..."
 git add package.json
 if git diff --cached --quiet; then
@@ -84,7 +79,7 @@ fi
 git tag -a "v$VERSION" -m "Release v$VERSION"
 ok "Tagged v$VERSION"
 
-# --- Step 5: Push tag to trigger CI build ---
+# --- Step 4: Push tag to trigger CI build ---
 info "Pushing tag to origin..."
 git push origin master --tags > /dev/null 2>&1
 ok "Pushed to origin (CI will build Docker Hub image)"
@@ -94,7 +89,6 @@ echo ""
 echo -e "${GREEN}=== Release v$VERSION complete ===${NC}"
 echo ""
 echo "Artifacts:"
-echo "  Docker image:  anki-spelling-portal:v$VERSION (local)"
 echo "  CI image:      gykpro/anki-spelling-portal:$VERSION (building...)"
 echo "  Skill tarball: releases/$TARBALL_NAME.tar.gz"
 echo "  Git tag:       v$VERSION"
