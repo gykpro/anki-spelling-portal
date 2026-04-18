@@ -137,7 +137,10 @@ export function saveSettings(updates: Partial<Record<ConfigKey, string>>): void 
 }
 
 /** Get the resolved AI backend mode */
-export function getAIBackend(): "sdk" | "cli" | "none" {
+export function getAIBackend(): "sdk" | "cli" | "canned" | "none" {
+  if (process.env.TEST_MODE === "true") {
+    return "canned";
+  }
   const setting = getConfig("AI_BACKEND");
 
   if (setting === "sdk") {

@@ -1,13 +1,14 @@
 import { getConfig, getAIBackend } from "./settings";
 import { runAnthropic, runAnthropicJSON, runAnthropicVision } from "./anthropic";
 import { runClaude, runClaudeJSON, runClaudeVision } from "./claude-cli";
+import { runCannedAI, runCannedAIJSON, runCannedAIVision } from "./canned-ai";
 
 export type ImageInput = {
   base64: string;
   mediaType: "image/png" | "image/jpeg" | "image/gif" | "image/webp" | "application/pdf";
 };
 
-function ensureBackend(): "sdk" | "cli" {
+function ensureBackend(): "sdk" | "cli" | "canned" {
   const backend = getAIBackend();
   if (backend === "none") {
     throw new Error(
@@ -20,18 +21,16 @@ function ensureBackend(): "sdk" | "cli" {
 /** Run a text prompt via the configured AI backend. Returns raw text. */
 export async function runAI(prompt: string): Promise<string> {
   const backend = ensureBackend();
-  if (backend === "sdk") {
-    return runAnthropic(prompt);
-  }
+  if (backend === "canned") return runCannedAI(prompt);
+  if (backend === "sdk") return runAnthropic(prompt);
   return runClaude(prompt);
 }
 
 /** Run a text prompt and parse result as JSON. */
 export async function runAIJSON<T = unknown>(prompt: string): Promise<T> {
   const backend = ensureBackend();
-  if (backend === "sdk") {
-    return runAnthropicJSON<T>(prompt);
-  }
+  if (backend === "canned") return runCannedAIJSON<T>(prompt);
+  if (backend === "sdk") return runAnthropicJSON<T>(prompt);
   return runClaudeJSON<T>(prompt);
 }
 
@@ -41,6 +40,7 @@ export async function runAIVision<T = unknown>(
   images: ImageInput[]
 ): Promise<T> {
   const backend = ensureBackend();
+  if (backend === "canned") return runCannedAIVision<T>(prompt, images);
   if (backend === "cli") {
     // Prefer SDK if API key is available (faster, no temp files)
     if (getConfig("ANTHROPIC_API_KEY")) {
