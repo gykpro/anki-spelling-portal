@@ -317,7 +317,7 @@ export default function QuickAddPage() {
       </div>
 
       {phase === "done" && result ? (
-        <div className="rounded-lg border border-success/50 bg-success/5 p-6 text-center">
+        <div data-testid="quick-add-success" className="rounded-lg border border-success/50 bg-success/5 p-6 text-center">
           <CheckCircle className="mx-auto h-10 w-10 text-success" />
           <h3 className="mt-3 text-lg font-semibold">Words Added</h3>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -450,6 +450,7 @@ export default function QuickAddPage() {
               One per line, or comma-separated. You can also paste a sentence to extract vocabulary.
             </p>
             <textarea
+              data-testid="quick-add-input"
               value={wordsInput}
               onChange={(e) => setWordsInput(e.target.value)}
               rows={8}
@@ -473,6 +474,7 @@ export default function QuickAddPage() {
           {words.length > 0 && (
             <div className="flex items-center gap-3">
               <button
+                data-testid="quick-add-submit"
                 onClick={checkAndSubmit}
                 disabled={phase === "checking" || phase === "submitting" || sentenceExtracting}
                 className="inline-flex items-center gap-2 rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-50"
