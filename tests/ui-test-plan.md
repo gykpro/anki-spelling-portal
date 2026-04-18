@@ -1,3 +1,14 @@
+> **Scope note (2026-04-18):** This plan is now a supplement to the executable test suite (`npm test`), not the primary verification mechanism. The executable suite — Vitest in `tests/unit/` and Playwright in `tests/e2e/` — covers the regression-critical happy paths and stable-boundary logic.
+>
+> This document is retained for:
+> - Flows that require a live Telegram bot (timing, multi-message batching, real user interaction).
+> - Destructive or timing-sensitive operations that would be brittle to automate (Anki stopped mid-run, profile switch races).
+> - Subjective assessment of real-AI output quality.
+>
+> Most sections below are NOT run on every commit. Use them when manually validating a related change or when investigating a reported bug. For the default definition of "tests pass," see `CLAUDE.md` → `npm test`.
+
+---
+
 # UI Test Plan — Browser Automation
 
 Follow this plan via Chrome browser automation. Improvise at each step based on
