@@ -4,13 +4,32 @@
 
 Follow this order for every feature request or change:
 
-1. **Plan first** — Enter plan mode, explore the codebase, and write an implementation plan for user approval before writing code.
-2. **Implement** — Write the code following the approved plan.
-3. **Update tests** — If the change affects UI behavior, update `tests/ui-test-plan.md` to reflect new or modified scenarios. Add new sections for new features, revise existing steps for changed behavior, remove obsolete cases.
-4. **Self-test** — Always run the UI test plan sections related to the new/changed features via browser automation. This is mandatory, not optional. Report results in a table. Fix any failures before proceeding.
-5. **Update Skill** - The project provides a skill for agents who wants to utilise the capabilities. Always check if the usage of new features are covered in generated skill document
-6. **Commit** — After tests pass, create a git commit with a descriptive message summarizing the change.
-7. **CRITICAL — Continue** — NEVER stop after a commit. Always do one of: (a) if there are more features to implement, immediately start the next one (back to step 1); (b) if unsure what to do next, use `AskUserQuestion` with a menu of options. You must NEVER end your turn silently after step 5. Stopping without asking is a workflow violation.
+1. **Spec first** — write acceptance criteria in the design doc (`docs/superpowers/specs/YYYY-MM-DD-*.md`). These become the test seeds.
+2. **Failing test first** — write Vitest or Playwright tests asserting the new behavior (or reproducing the bug) before touching production code.
+3. **Test review gate** — present the test diffs + a plain-English summary of each test to the user. Wait for approval before writing any production code. This gate is non-negotiable; even tiny changes require it.
+4. **Implement** — write the minimal production code to turn the approved failing tests green.
+5. **`npm test`** — run the full suite. All green before committing.
+6. **Update Skill** — check if the skill document (`.claude/skills/anki-enrich/SKILL.md`) needs updating for user-facing changes.
+7. **Commit** — test change and behavior change ship in the **same commit**. Commit body must include a pass/fail matrix.
+8. **CRITICAL — Continue** — NEVER stop after a commit. Either start the next pending item or use `AskUserQuestion` with options.
+
+### The three hard rules
+
+1. **All tests pass before commit.** `npm test` green; agent reports pass/fail matrix in the commit body.
+2. **Every user-visible behavior change ships with a test change in the same commit.** New behavior → new test. Changed behavior → updated test. Removed behavior → deleted test.
+3. **Test changes are reviewed and approved before implementation begins.** No production code is written against unreviewed tests.
+
+### Scenario playbook
+
+| Scenario | Workflow |
+|---|---|
+| New feature | Acceptance criteria in spec → failing tests → **user reviews tests** → code → green |
+| Bug fix | Failing test that reproduces the bug → **user confirms test reproduces the bug** → fix → green |
+| Mid-flight requirement change | Update **spec → tests → user re-reviews → code**, in that order |
+| Pure refactor | Zero test changes expected. No review gate needed. |
+| Test fails mysteriously | Investigate before skipping. If skipped, add `// TODO(owner, issue)` and flag to user. |
+| Test data shape changes | Update the factory (one place), not N fixtures. |
+| Test mechanism needs rewrite | Pause — the boundary was probably wrong. |
 
 ## Task Tracking
 
@@ -37,11 +56,16 @@ Follow this order for every feature request or change:
 
 ## Testing Conventions
 
-- Test plan lives at `tests/ui-test-plan.md`
-- All test data uses `__test_` prefix for easy cleanup
-- Always run cleanup (section 6) after testing to remove test data from Anki
-- If a test fails, fix the code and re-test before committing
-- Edge cases matter — test empty states, invalid input, error handling, not just happy paths
+- **Two executable layers + slim manual plan:**
+  - **Vitest** (`tests/unit/`) — boundary tests on `src/lib/*`. Fast, deterministic. Mock AI at the `src/lib/ai.ts` boundary (or rely on the canned backend via `TEST_MODE`).
+  - **Playwright** (`tests/e2e/`) — page-level journey tests. Dev server launched with `TEST_MODE=true` so AI is canned.
+  - **Manual plan** (`tests/ui-test-plan.md`) — retained for edge cases not worth automating: destructive ops, Telegram races, visual/quality regression of real AI output.
+- **Test at behavior, not implementation.** A pure refactor should touch zero tests.
+- **Factories over fixtures.** `makeTestCard({ overrides })` in `tests/fixtures/`.
+- **Stable selectors.** Playwright uses `data-testid="<feature>-<element>"`. Never CSS paths or text.
+- **All test data uses `__test_` prefix.** Cleanup runs before AND after each Playwright spec via `tests/setup/anki-test-helpers.ts`.
+- **Run tests on the `Test` Anki profile** (or any profile with both decks) to avoid polluting real profiles.
+- Edge cases matter — empty states, invalid input, error handling, not just happy paths.
 
 ## Tech Stack Reminders
 
