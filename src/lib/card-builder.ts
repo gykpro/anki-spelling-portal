@@ -26,7 +26,7 @@ export function buildCloze(sentence: string, word: string): string {
     `(${word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`,
     "i"
   );
-  return sentence.replace(regex, "{{c1::$1}}");
+  return sentence.replace(regex, '<span class="nodeword">{{c1::$1}}</span>');
 }
 
 /**

@@ -25,12 +25,22 @@ describe("buildMainSentence", () => {
 });
 
 describe("buildCloze", () => {
-  it("replaces the word with {{c1::word}}", () => {
-    expect(buildCloze("I ate an apple.", "apple")).toBe("I ate an {{c1::apple}}.");
+  it("wraps the cloze directive with <span class='nodeword'>", () => {
+    expect(buildCloze("I ate an apple.", "apple")).toBe(
+      'I ate an <span class="nodeword">{{c1::apple}}</span>.',
+    );
   });
 
-  it("matches case-insensitively", () => {
-    expect(buildCloze("Apple pie is great.", "apple")).toBe("{{c1::Apple}} pie is great.");
+  it("matches case-insensitively and preserves original case inside the cloze directive", () => {
+    expect(buildCloze("Apple pie is great.", "apple")).toBe(
+      '<span class="nodeword">{{c1::Apple}}</span> pie is great.',
+    );
+  });
+
+  it("escapes regex special characters in the word", () => {
+    expect(buildCloze("He's at the café.", "he's")).toBe(
+      '<span class="nodeword">{{c1::He\'s}}</span> at the café.',
+    );
   });
 });
 
@@ -54,7 +64,7 @@ describe("buildSpellingCard", () => {
       "Fruit"
     );
     expect(card.mainSentence).toBe('I ate an <span class="nodeword">apple</span>.');
-    expect(card.cloze).toBe("I ate an {{c1::apple}}.");
+    expect(card.cloze).toBe('I ate an <span class="nodeword">{{c1::apple}}</span>.');
   });
 });
 
