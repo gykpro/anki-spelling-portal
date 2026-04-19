@@ -1179,11 +1179,17 @@ export async function distributeNotes(
   return results;
 }
 
-/** Extract worksheet data from images using AI Vision, then split
- *  English long-phrase entries into one card per hard sub-word. */
+/** Extract worksheet data from images using AI Vision.
+ *
+ *  The auto-split of long English phrases via splitLongPhrasesInPages
+ *  is intentionally NOT applied here — validation against real worksheets
+ *  revealed that most long underlined spans are legitimate multi-word
+ *  phrases (idioms/collocations), not sentence fragments, so auto-split
+ *  was damaging cards the teacher underlined as units. The splitter is
+ *  retained as an exported function for a future per-phrase manual
+ *  "Split into words" button in the review UI (see docs/todo.md). */
 export async function extractFromImages(
   images: ImageInput[]
 ): Promise<ExtractedPage[]> {
-  const pages = await runAIVision<ExtractedPage[]>(EXTRACTION_PROMPT, images);
-  return splitLongPhrasesInPages(pages);
+  return runAIVision<ExtractedPage[]>(EXTRACTION_PROMPT, images);
 }
