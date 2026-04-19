@@ -25,7 +25,7 @@ export async function mapEnrichResultToAnkiFields(noteId, word, result) {
       regex,
       '<span class="nodeword">$1</span>'
     );
-    fields["Cloze"] = result.sentence.replace(regex, "{{c1::$1}}");
+    fields["Cloze"] = result.sentence.replace(regex, '<span class="nodeword">{{c1::$1}}</span>');
   }
 
   if (result.definition) fields["Definition"] = String(result.definition);

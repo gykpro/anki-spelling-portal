@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { runAIVision } from "@/lib/ai";
-import { EXTRACTION_PROMPT } from "@/lib/enrichment-pipeline";
+import { extractFromImages } from "@/lib/enrichment-pipeline";
 
 function getMediaType(filename: string): "image/png" | "image/jpeg" | "image/gif" | "image/webp" | "application/pdf" {
   const ext = filename.split(".").pop()?.toLowerCase();
@@ -43,7 +42,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Send images to AI backend (vision requires SDK)
-    const pages = await runAIVision(EXTRACTION_PROMPT, images);
+    const pages = await extractFromImages(images);
 
     return NextResponse.json({ pages });
   } catch (error) {

@@ -17,7 +17,7 @@ import {
   buildCloze,
   cardToAnkiNote,
 } from "@/lib/card-builder";
-import type { ExtractedPage, SpellingCard } from "@/types/spelling";
+import type { ExtractedPage, ExtractedSentence, SpellingCard } from "@/types/spelling";
 import type { BatchEnrichResultItem } from "@/types/enrichment";
 import {
   type LanguageConfig,
@@ -341,6 +341,73 @@ Extract 1-3 key vocabulary words/phrases from the sentence that a Primary 4 stud
       item.word ?? item.Word ?? item.text ?? item.value ?? Object.values(item)[0];
     return String(val ?? "");
   }).filter((w) => w.length > 0);
+}
+
+/**
+ * Post-process extracted pages: for English entries whose `word` is ≥5
+ * whitespace-separated tokens, replace the single long-phrase entry with
+ * one entry per hard sub-word returned by the extractor. All emitted
+ * sub-word entries inherit the parent entry's `number` and `sentence`.
+ *
+ * - Chinese entries are never split.
+ * - Empty extractor response, extractor throw, or all-dedupe → fall back
+ *   to the original entry (one bad line never poisons the batch).
+ * - Dedup within a page: if a hard word already exists as another entry's
+ *   `word` on the same page, it's dropped (case-insensitive).
+ *
+ * Pure: no external side effects except a console.warn on extractor throw.
+ * The extractor is injected for testability; production passes
+ * extractWordsFromSentence.
+ */
+export async function splitLongPhrasesInPages(
+  pages: ExtractedPage[],
+  extractor: (
+    s: string,
+    l: LanguageConfig,
+  ) => Promise<string[]> = extractWordsFromSentence,
+): Promise<ExtractedPage[]> {
+  return Promise.all(pages.map((page) => splitPage(page, extractor)));
+}
+
+async function splitPage(
+  page: ExtractedPage,
+  extractor: (s: string, l: LanguageConfig) => Promise<string[]>,
+): Promise<ExtractedPage> {
+  const existingWords = new Set(
+    page.sentences.map((s) => s.word.toLowerCase()),
+  );
+  const englishLang = getLanguageById("english");
+
+  const results: ExtractedSentence[][] = await Promise.all(
+    page.sentences.map(async (entry) => {
+      if (detectLanguage(entry.word).id !== "english") return [entry];
+      if (entry.word.trim().split(/\s+/).length < 5) return [entry];
+
+      let hardWords: string[];
+      try {
+        hardWords = await extractor(entry.word, englishLang);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn(
+          `[splitLongPhrasesInPages] extractor threw on "${entry.word}": ${msg}`,
+        );
+        return [entry];
+      }
+
+      const deduped = hardWords.filter(
+        (w) => !existingWords.has(w.toLowerCase()),
+      );
+      if (deduped.length === 0) return [entry];
+
+      return deduped.map((word) => ({
+        number: entry.number,
+        sentence: entry.sentence,
+        word,
+      }));
+    }),
+  );
+
+  return { ...page, sentences: results.flat() };
 }
 
 export function buildBatchPrompt(
@@ -1112,9 +1179,11 @@ export async function distributeNotes(
   return results;
 }
 
-/** Extract worksheet data from images using AI Vision */
+/** Extract worksheet data from images using AI Vision, then split
+ *  English long-phrase entries into one card per hard sub-word. */
 export async function extractFromImages(
   images: ImageInput[]
 ): Promise<ExtractedPage[]> {
-  return runAIVision<ExtractedPage[]>(EXTRACTION_PROMPT, images);
+  const pages = await runAIVision<ExtractedPage[]>(EXTRACTION_PROMPT, images);
+  return splitLongPhrasesInPages(pages);
 }

@@ -52,5 +52,11 @@ next-env.d.ts
 # local deploy config (contains NAS credentials)
 scripts/deploy-nas.sh
 
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+
 # dev container config
 .devcontainer/
