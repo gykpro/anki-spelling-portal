@@ -13,6 +13,8 @@
 ## In Progress
 
 ## Pending
+- [ ] **Long underlined phrase split (English worksheet)** — For English worksheet lines whose underlined span is ≥5 whitespace tokens, split into one card per hard sub-word (each sharing the original sentence). Seam: `splitLongPhrasesInPages` inside `extractFromImages`. Chinese, Quick Add sentence, Telegram sentence, and idiom (<5 words) paths unchanged. Spec: `docs/superpowers/specs/2026-04-19-long-underlined-phrase-split-design.md`. Status: spec awaiting user review.
+- [ ] **Layered pipeline architecture review** (deferred) — Promote a `(word, example sentence, clause) → enriched card` primitive to public API; make worksheet OCR a thin adapter above it. Intended to give future changes a clear layer to land in. Not started — awaits user greenlight as its own feature cycle.
 - [ ] **Telegram intent: long-English chitchat → unknown** — `src/lib/telegram/intent.ts` has an `unknown` branch for English >5 words that is unreachable: `isSentenceInput` returns true for any English text with >3 words first, so long chitchat is currently routed to `sentence` and fed to `extractWordsFromSentence`. Either re-order the checks (unknown wins for English >5 words with no punctuation) or raise the `isSentenceInput` English threshold. Discovered by `tests/unit/telegram-intent.test.ts` during Phase A.5.
 
 ## Recently Completed
