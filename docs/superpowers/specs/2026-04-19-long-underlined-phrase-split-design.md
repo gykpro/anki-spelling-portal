@@ -40,11 +40,17 @@ Input (worksheet):
 
 Review UI before this change:
   Card A  Word: an infinitely huge place with trillions of stars
-          Main Sentence: Outer space is <highlight>an infinitely…stars</highlight>.
+          Main Sentence: Outer space is <span class="nodeword">an infinitely huge place with trillions of stars</span>.
 
 Review UI after this change (example — AI-chosen sub-words):
-  Card A  Word: infinitely   Main Sentence: Outer space is an infinitely huge place…
-  Card B  Word: trillions    Main Sentence: Outer space is an infinitely huge place…
+  Card A  Word: infinitely
+          Main Sentence: Outer space is an <span class="nodeword">infinitely</span> huge place with trillions of stars.
+  Card B  Word: trillions
+          Main Sentence: Outer space is an infinitely huge place with <span class="nodeword">trillions</span> of stars.
+
+(The .nodeword CSS rule lives in the Anki note type's card template; both
+before and after markup render with the same highlight style. No Anki
+template change is needed.)
 ```
 
 The long phrase itself is **not** retained as a card. Users see the expanded word list in the normal review UI and can edit or delete individual entries as always.
