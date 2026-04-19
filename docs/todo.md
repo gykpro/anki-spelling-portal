@@ -13,6 +13,7 @@
 ## In Progress
 
 ## Pending
+- [ ] **Telegram intent: long-English chitchat → unknown** — `src/lib/telegram/intent.ts` has an `unknown` branch for English >5 words that is unreachable: `isSentenceInput` returns true for any English text with >3 words first, so long chitchat is currently routed to `sentence` and fed to `extractWordsFromSentence`. Either re-order the checks (unknown wins for English >5 words with no punctuation) or raise the `isSentenceInput` English threshold. Discovered by `tests/unit/telegram-intent.test.ts` during Phase A.5.
 
 ## Recently Completed
 - [x] **Reliable Feature Delivery Workflow — Phase A (Infrastructure)** — Installed Vitest + Playwright. Added `canned` AI backend triggered by `TEST_MODE=true`. Added `makeTestCard` factory, canned enrichment fixtures, Anki `__test_*` cleanup helpers wired to Playwright global setup. Proof-of-harness tests: `card-completeness.test.ts` (Vitest, 3/3 pass) and `quick-add.spec.ts` (Playwright, 1/1 pass). CLAUDE.md now encodes the three hard rules (tests pass before commit, test change ships with behavior change, test-review gate before implementation) and the scenario playbook. `tests/ui-test-plan.md` repositioned as edge-case-only supplement. See spec `docs/superpowers/specs/2026-04-18-reliable-feature-delivery-workflow-design.md` and plan `docs/superpowers/plans/2026-04-18-reliable-feature-delivery-workflow.md`. Phase B (pilot feature) is a separate cycle.
