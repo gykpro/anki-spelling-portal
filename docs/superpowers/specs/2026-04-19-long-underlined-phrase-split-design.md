@@ -2,7 +2,7 @@
 
 **Date:** 2026-04-19
 **Status:** Draft, pending user review
-**Scope:** English worksheet extraction only
+**Scope:** English worksheet extraction split + correct `.nodeword` span wrapping for Anki rendering
 
 ## Problem
 
@@ -18,19 +18,25 @@ Today, the entire underlined span becomes a single Anki card's `Word` field. Dow
 
 ## Goals
 
-- For English worksheet lines whose underlined span is ≥5 whitespace-separated tokens, replace the single long-phrase card with **one card per hard sub-word**, each sharing the original sentence as `Main Sentence`.
+- **Goal 1 — long-phrase split.** For English worksheet lines whose underlined span is ≥5 whitespace-separated tokens, replace the single long-phrase card with **one card per hard sub-word**, each sharing the original sentence as `Main Sentence`.
 - Preserve the teacher's signal: feed the sub-word extractor the underlined span itself (not the full sentence), since the teacher already filtered to what they consider worth studying.
-- No change to Chinese worksheet extraction, Quick Add, Telegram sentence-input, review UI, enrichment, or Anki templates.
+- **Goal 2 — cloze span-wrap.** The existing `Main Sentence` field is not displayed by the user's Anki template; the template uses the `Cloze` field and styles the highlight there. Today's `<span class="nodeword">` wrapping on `Main Sentence` is a no-op in Anki (it only styles in the portal's own review UI via `src/app/globals.css:32`). This spec wraps the **cloze directive itself** with `<span class="nodeword">...</span>` so the existing `.nodeword` CSS rule in the Anki card template takes effect. Outside-wrap shape: `<span class="nodeword">{{c1::word}}</span>` — the span applies on both the cloze-hidden front card (wrapping the `[…]` placeholder) and the cloze-shown back card (wrapping the word).
+- No change to Chinese worksheet extraction, Quick Add or Telegram sentence-input pipelines, enrichment content, or Anki templates themselves.
 
 ## Non-goals
 
 - Chinese worksheet long phrases (confirmed not to occur in practice; symmetric logic can be added later if a case appears).
 - Idiom detection (English ≥5-word threshold is a deliberate simplification; multi-word idioms longer than 4 words are rare in Primary 4 worksheets).
 - New review-UI affordances (e.g. manual "Split" button). The split happens server-side before review.
-- Any change to the `is_dictation` / `is_dictation_mem` fields or the Anki card template.
+- Any change to the `is_dictation` / `is_dictation_mem` fields or the Anki card template itself.
+- Removing the now-dead `<span class="nodeword">` wrapping on the `Main Sentence` field. It still styles the portal's own preview UI via `globals.css:32` and is inert in Anki; cleanup would be a separate non-blocking change.
+- Refactoring the four inline cloze regexes (quick-add, enrich ×2, skill script) to share `buildCloze`. Flagged as follow-up tech debt in `docs/todo.md`.
+- Backfilling existing Anki cards' `Cloze` markup. Only new cards get the new wrapping.
 - Related but deferred: **layered pipeline refactor** — promote the `(word, sentence, clause) → enriched card` core into a public primitive, with worksheet extraction becoming a thin adapter on top. Tracked as a separate architecture review.
 
 ## User-facing behavior
+
+### Field output (what the app writes into Anki)
 
 For a worksheet line with a long underlined span:
 
@@ -38,20 +44,31 @@ For a worksheet line with a long underlined span:
 Input (worksheet):
   "Outer space is [an infinitely huge place with trillions of stars]."
 
-Review UI before this change:
-  Card A  Word: an infinitely huge place with trillions of stars
+BEFORE this change (one long-phrase card):
+  Card A  Word:          an infinitely huge place with trillions of stars
           Main Sentence: Outer space is <span class="nodeword">an infinitely huge place with trillions of stars</span>.
+          Cloze:         Outer space is {{c1::an infinitely huge place with trillions of stars}}.
 
-Review UI after this change (example — AI-chosen sub-words):
-  Card A  Word: infinitely
+AFTER this change (N sub-word cards sharing the sentence):
+  Card A  Word:          infinitely
           Main Sentence: Outer space is an <span class="nodeword">infinitely</span> huge place with trillions of stars.
-  Card B  Word: trillions
+          Cloze:         Outer space is an <span class="nodeword">{{c1::infinitely}}</span> huge place with trillions of stars.
+  Card B  Word:          trillions
           Main Sentence: Outer space is an infinitely huge place with <span class="nodeword">trillions</span> of stars.
-
-(The .nodeword CSS rule lives in the Anki note type's card template; both
-before and after markup render with the same highlight style. No Anki
-template change is needed.)
+          Cloze:         Outer space is an infinitely huge place with <span class="nodeword">{{c1::trillions}}</span> of stars.
 ```
+
+Two things are changing in the output:
+
+1. **Split:** one line expands to N cards with sub-words as `Word`.
+2. **Cloze markup:** the `Cloze` field now wraps the cloze directive with `<span class="nodeword">…</span>`. This applies to **every** card going forward, not just split cards — short single-word underlines also get the new cloze markup.
+
+### Anki rendering (what the template actually shows)
+
+The user's Anki card template uses the `Cloze` field (not `Main Sentence`) as the main display. A JS function in the template additionally post-processes the cloze text. The `.nodeword` CSS rule also lives in the template's styling section.
+
+- Before this change: the `Cloze` field has no `.nodeword` wrapper, so the template's CSS rule matches nothing, and the highlight does not render in Anki (it only appears in the portal's own review UI). This is the pre-existing bug Goal 2 fixes.
+- After this change: the `.nodeword` span wraps the cloze block, so the template's CSS rule applies on both the front (hidden `[…]`) and back (revealed word). The `Main Sentence` field's existing `.nodeword` wrapping is kept as-is — it still styles the portal's own preview UI via `src/app/globals.css:32` and is inert in Anki; deliberately out of scope to remove.
 
 The long phrase itself is **not** retained as a card. Users see the expanded word list in the normal review UI and can edit or delete individual entries as always.
 
@@ -68,13 +85,27 @@ The long phrase itself is **not** retained as a card. Users see the expanded wor
 
 ## Architecture
 
-### Seam placement
+### Goal 1 — seam placement for the splitter
 
 Both worksheet entry points will share the splitter by routing through a single pure helper:
 
 - `src/lib/enrichment-pipeline.ts :: extractFromImages(images)` — **this wrapper gains the splitter**. Currently a one-line passthrough around `runAIVision(EXTRACTION_PROMPT, images)`. After the change it returns `splitLongPhrasesInPages(pages)` applied to the vision output.
 - `src/app/api/extract/route.ts` — **refactored** to call `extractFromImages(images)` instead of `runAIVision` directly. The route currently imports `EXTRACTION_PROMPT` to call `runAIVision` itself; after the change the prompt import is gone from the route.
 - `src/lib/telegram/handlers.ts` — already calls `extractFromImages(...)` for photo and document worksheet uploads. Inherits the split automatically, no handler change needed.
+
+### Goal 2 — call sites that must change for the cloze span-wrap
+
+The cloze-producing logic is duplicated across five places today (pre-existing tech debt; deliberately **not** refactored as part of this feature). All five must emit the new output shape `<span class="nodeword">{{c1::$1}}</span>`:
+
+| File | Today | After |
+|---|---|---|
+| `src/lib/card-builder.ts :: buildCloze` (line 29) | `sentence.replace(regex, "{{c1::$1}}")` | `sentence.replace(regex, '<span class="nodeword">{{c1::$1}}</span>')` |
+| `src/app/quick-add/page.tsx` (line 39) | inline `"{{c1::$1}}"` | inline `'<span class="nodeword">{{c1::$1}}</span>'` |
+| `src/app/enrich/page.tsx` (line 586) | inline `"{{c1::$1}}"` | same update |
+| `src/app/enrich/page.tsx` (line 1278) | inline `"{{c1::$1}}"` | same update |
+| `skill/scripts/lib/anki-fields.mjs` (line 28) | inline `"{{c1::$1}}"` | same update |
+
+The `buildMainSentence` function and the four inline main-sentence regexes are untouched. Refactoring the four inline cloze regexes to use `buildCloze` is out of scope — flagged in docs/todo.md as follow-up tech debt.
 
 ### Pure helper
 
@@ -126,6 +157,15 @@ Boundary tests against `splitLongPhrasesInPages` with a deterministic stub extra
 
 Each test uses a page built from a `make-spelling-card`-style factory (or inline literal, given the shape is small).
 
+### Vitest — update `tests/unit/card-builder.test.ts` (existing file)
+
+The existing `buildCloze` and `buildSpellingCard` assertions today check `"I ate an {{c1::apple}}."`. Those assertions must be **updated** to expect `'I ate an <span class="nodeword">{{c1::apple}}</span>.'` — a behavior change paired with its test change, in the same commit, per the three hard rules.
+
+Add two new `buildCloze` tests to lock the new contract explicitly:
+
+- `buildCloze` wraps the cloze directive with `<span class="nodeword">…</span>`.
+- Case-insensitive match still preserves original case inside the cloze directive (e.g. `'Apple pie'` with word `'apple'` produces `'<span class="nodeword">{{c1::Apple}}</span> pie.'`).
+
 ### Mutation spot-check (mandatory at test-review gate)
 
 Before the user reviews, mutate production in 1–2 obvious ways, confirm at least one test kills each mutation, revert:
@@ -133,6 +173,8 @@ Before the user reviews, mutate production in 1–2 obvious ways, confirm at lea
 - **M1: flip the length threshold.** Change `>= 5` to `> 5`. Expect test #2 (exactly 5 tokens) to fail.
 - **M2: remove the language gate.** Always run the splitter. Expect test #4 (Chinese) to fail.
 - **M3: remove the empty-response fallback.** Emit zero entries when extractor returns `[]`. Expect test #5 to fail (entry disappears instead of being preserved).
+- **M4: drop the span wrapper from buildCloze.** Revert to `"{{c1::$1}}"`. Expect the updated `buildCloze` and `buildSpellingCard` tests to fail.
+- **M5: typo the class name.** Change `nodeword` to `wordnode`. Expect the class-assertion tests to fail.
 
 Kill report included in commit body.
 
@@ -143,9 +185,12 @@ No new e2e test. Worksheet-photo upload isn't yet automated in Playwright; addin
 ## Rollout
 
 - No database, no schema, no Anki template change.
-- After merge, restart `npm run dev` so the Telegram bot reloads `extractFromImages`.
-- No migration of existing long-phrase cards already in Anki. They stay as-is; only future uploads are split.
+- After merge, restart `npm run dev` so the Telegram bot reloads `extractFromImages` and the inline cloze regexes.
+- No migration of existing cards already in Anki. They retain their current `Cloze` markup (no `.nodeword` wrapper); only newly-created cards get the new markup. If the user wants to backfill, that's a separate one-off script and out of scope here.
+- Confirm after rollout that the Anki card template's `.nodeword` CSS rule actually exists — if not, the span wraps correctly but no highlight appears in Anki. (Cannot be verified from code; user to check the note type's "Cards…" dialog in Anki.)
 
 ## Open questions
 
-None outstanding — all prior clarifying questions resolved (card shape, length threshold, language scope, extractor input source, seam placement).
+- **User verification only:** does the user's Anki note-type card template contain a `.nodeword { … }` CSS rule? If not, Goal 2's wrapping is written correctly but no highlight renders in Anki, and the user would need to add the CSS rule to the template styling (one-time, manual, out of this codebase's scope). Flagged in Rollout section.
+
+All other prior clarifying questions resolved (card shape, length threshold, language scope, extractor input source, seam placement, cloze wrap direction).
