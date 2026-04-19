@@ -255,10 +255,62 @@ Before running tests, configure all API keys via the **Settings page** (`/settin
 - Click on a single-character word with stroke order — verify Stroke Order shows green checkmark
 - Click on a multi-character word missing some stroke order GIFs — verify Stroke Order shows "(partial: N/M chars)" warning
 
+### 3h4. Word Detail Drawer — Media preview
+- Click on a word that has audio (Audio field filled)
+- Verify the Audio section shows an audio player control (not just filename text)
+- Click play on the audio player — verify audio plays
+- Verify Main Sentence Audio also has a playable audio control (if filled)
+- Verify the Picture field shows the actual image (not a broken image icon)
+- For Chinese cards with Stroke Order, verify stroke order GIFs render correctly
+
 ### 3h3. Stroke Order filter — partial detection
 - Navigate to Chinese deck, click "No Stroke Order" filter
 - Verify the count includes cards with partial stroke order (fewer `<img>` tags than CJK characters in the word)
 - Verify cards with complete stroke order (matching img count) are NOT shown
+
+### 3i. Delete Selected — confirmation modal
+- Select 2-3 test cards via checkboxes
+- Click the red "Delete" button in the selection bar
+- Verify a confirmation modal appears showing:
+  - The word list of selected cards
+  - Warning about deletion from all profiles
+  - Cancel and Delete buttons
+- Click Cancel — verify modal closes, cards still selected
+
+### 3j. Delete Selected — execute deletion
+- Select 1 test card (e.g., `__test_cherry`)
+- Click Delete, then confirm in the modal
+- Verify the Delete button shows loading spinner
+- After completion, verify:
+  - Modal closes
+  - Selection is cleared
+  - Card list refreshes and the deleted card is gone
+  - Card count decreases by 1
+
+### 3k. Clear Fields — field picker modal
+- Select 2-3 test cards
+- Click the "Clear Fields" button in the selection bar
+- Verify a modal appears with:
+  - Checkboxes for each field grouped by Text and Media
+  - "Select All" toggle
+  - Summary text showing field and card counts
+- Click Cancel — verify modal closes, no changes made
+
+### 3l. Clear Fields — execute clearing
+- Select 1-2 test cards that have enriched data (sentence, definition, etc.)
+- Click "Clear Fields"
+- Check "Definition" and "Phonetic / Pinyin"
+- Click "Clear Fields" button in the modal
+- Verify the button shows loading spinner
+- After completion, verify:
+  - Modal closes
+  - Card list refreshes
+  - The selected cards now show those fields as empty (reflected in filter counts)
+
+### 3m. Clear Fields — then re-enrich
+- After clearing fields in 3l, select the same cards
+- Click "Enrich Selected" to navigate to the Enrich page
+- Verify the cleared fields show as empty and can be re-generated
 
 ---
 

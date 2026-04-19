@@ -49,6 +49,8 @@ Match the user's intent to the appropriate script:
 | Enrich Chinese words | `enrich-full.mjs` | "enrich 勇敢 and 智慧" |
 | Extract words from worksheet photos | `extract-worksheet.mjs` | "extract words from this worksheet photo" |
 | Extract AND enrich from worksheets | `extract-worksheet.mjs --enrich` | "process this spelling worksheet" |
+| Delete cards from all profiles | Portal API: `DELETE /api/anki/notes` | "delete these cards" |
+| Clear enrichment fields for re-generation | Portal API: `POST /api/anki/notes/clear-fields` | "clear the definitions so I can re-enrich" |
 
 **Default**: If the user just says "enrich [words]" without specifying what, use `enrich-full.mjs`.
 
@@ -155,6 +157,34 @@ Progress messages go to stderr. Parse stdout for the JSON summary.
 ## Error Handling
 
 If you see "Cannot reach Anki portal", the portal server isn't running or `config.json` points to the wrong URL. If you see "AnkiConnect unreachable", Anki desktop isn't running or AnkiConnect plugin isn't installed.
+
+## Portal API — Delete & Clear
+
+These operations are available via the portal REST API (no dedicated script needed).
+
+### Delete notes across all profiles
+```bash
+curl -X DELETE http://localhost:3001/api/anki/notes \
+  -H "Content-Type: application/json" \
+  -d '{"noteIds": [1234567890, 1234567891]}'
+```
+
+Response: `{ "homeDeleted": 2, "profileResults": [{ "profile": "...", "success": true, "notesDistributed": 2 }] }`
+
+Deletes notes from the active profile and all configured distribution target profiles (matched by Note ID UUID).
+
+### Clear enrichment fields
+```bash
+curl -X POST http://localhost:3001/api/anki/notes/clear-fields \
+  -H "Content-Type: application/json" \
+  -d '{"noteIds": [1234567890], "fields": ["definition", "phonetic", "image"]}'
+```
+
+Response: `{ "updated": 1 }`
+
+Available field keys: `sentence`, `definition`, `phonetic`, `synonyms`, `extra_info`, `sentencePinyin`, `audio`, `sentence_audio`, `image`, `strokeOrder`, `extra_info_audio`.
+
+Clearing `sentence` also clears dependent fields (Cloze, Main Sentence Audio, Main Sentence Pinyin). Does not distribute to other profiles — re-enrich and distribute fresh.
 
 ## Environment Variable Override
 

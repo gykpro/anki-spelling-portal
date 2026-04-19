@@ -149,6 +149,11 @@ export const ankiConnect = {
     return invoke<string>("storeMediaFile", { filename, data }, 120000);
   },
 
+  /** Retrieve a media file from Anki (returns base64) */
+  async retrieveMediaFile(filename: string): Promise<string> {
+    return invoke<string>("retrieveMediaFile", { filename });
+  },
+
   /** Delete notes by ID */
   async deleteNotes(notes: number[]): Promise<void> {
     await invoke("deleteNotes", { notes });

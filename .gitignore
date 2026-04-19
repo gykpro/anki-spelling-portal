@@ -57,3 +57,6 @@ scripts/deploy-nas.sh
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+
+# dev container config
+.devcontainer/
