@@ -6,7 +6,7 @@ Follow this order for every feature request or change:
 
 1. **Spec first** — write acceptance criteria in the design doc (`docs/superpowers/specs/YYYY-MM-DD-*.md`). These become the test seeds.
 2. **Failing test first** — write Vitest or Playwright tests asserting the new behavior (or reproducing the bug) before touching production code.
-3. **Test review gate** — present the test diffs + a plain-English summary of each test to the user. Wait for approval before writing any production code. This gate is non-negotiable; even tiny changes require it.
+3. **Test review gate** — present the test diffs + a plain-English summary of each test to the user. **Before presenting**, run a mutation spot-check: temporarily mutate the production code in 1–2 obvious ways (e.g., flip a boolean return, force a single branch), confirm tests catch each mutation, then revert. Include the mutation kill report in the commit body. Wait for approval before writing any production code. This gate is non-negotiable; even tiny changes require it.
 4. **Implement** — write the minimal production code to turn the approved failing tests green.
 5. **`npm test`** — run the full suite. All green before committing.
 6. **Update Skill** — check if the skill document (`.claude/skills/anki-enrich/SKILL.md`) needs updating for user-facing changes.
