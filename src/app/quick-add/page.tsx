@@ -36,7 +36,7 @@ function buildQuickAddFields(word: string, lang: ReturnType<typeof detectLang>, 
       "i"
     );
     mainSentence = sentence.replace(regex, '<span class="nodeword">$1</span>');
-    cloze = sentence.replace(regex, "{{c1::$1}}");
+    cloze = sentence.replace(regex, '<span class="nodeword">{{c1::$1}}</span>');
   }
 
   const base: Record<string, string> = {

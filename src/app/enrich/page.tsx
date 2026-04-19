@@ -583,7 +583,7 @@ function EnrichContent() {
         regex,
         '<span class="nodeword">$1</span>'
       );
-      fields["Cloze"] = sent.replace(regex, "{{c1::$1}}");
+      fields["Cloze"] = sent.replace(regex, '<span class="nodeword">{{c1::$1}}</span>');
     }
     if (r.definition) fields["Definition"] = r.definition as string;
     if (r.phonetic) fields["Phonetic symbol"] = r.phonetic as string;
@@ -1275,7 +1275,7 @@ function EnrichContent() {
           regex,
           '<span class="nodeword">$1</span>'
         );
-        fields["Cloze"] = item.sentence.replace(regex, "{{c1::$1}}");
+        fields["Cloze"] = item.sentence.replace(regex, '<span class="nodeword">{{c1::$1}}</span>');
       }
       if (item.definition) fields["Definition"] = item.definition;
       if (item.phonetic) fields["Phonetic symbol"] = item.phonetic;
