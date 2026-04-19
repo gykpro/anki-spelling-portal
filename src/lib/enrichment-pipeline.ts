@@ -1179,9 +1179,11 @@ export async function distributeNotes(
   return results;
 }
 
-/** Extract worksheet data from images using AI Vision */
+/** Extract worksheet data from images using AI Vision, then split
+ *  English long-phrase entries into one card per hard sub-word. */
 export async function extractFromImages(
   images: ImageInput[]
 ): Promise<ExtractedPage[]> {
-  return runAIVision<ExtractedPage[]>(EXTRACTION_PROMPT, images);
+  const pages = await runAIVision<ExtractedPage[]>(EXTRACTION_PROMPT, images);
+  return splitLongPhrasesInPages(pages);
 }
