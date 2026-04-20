@@ -2,7 +2,7 @@
  * Telegram message handlers.
  */
 import type { Bot } from "grammy";
-import { detectIntent } from "./intent";
+import { detectIntent, type Intent } from "./intent";
 import { createProgressReporter } from "./progress";
 import {
   runPipeline,
@@ -209,7 +209,15 @@ export function registerHandlers(bot: Bot): void {
   bot.on("message:text", async (ctx) => {
     const uid = getUid(ctx);
     const text = ctx.message.text;
-    const intent = detectIntent(text);
+
+    let intent: Intent;
+    try {
+      intent = await detectIntent(text);
+    } catch (err) {
+      console.warn("[telegram] intent classifier failed:", err);
+      await ctx.reply(t(uid, "intent_classify_failed"));
+      return;
+    }
 
     if (intent.type === "unknown") {
       await ctx.reply(t(uid, "usage_text"), { parse_mode: "HTML" });

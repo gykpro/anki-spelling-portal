@@ -51,7 +51,8 @@ export type MsgKey =
   | "extracting_words_from_sentence"
   | "no_words_extracted"
   | "service_shutting_down"
-  | "service_back_online";
+  | "service_back_online"
+  | "intent_classify_failed";
 
 const translations: Record<Lang, Record<MsgKey, string>> = {
   english: {
@@ -108,6 +109,8 @@ const translations: Record<Lang, Record<MsgKey, string>> = {
       "Could not extract any vocabulary words from that sentence.",
     service_shutting_down: "🔄 Service is restarting — back shortly!",
     service_back_online: "✅ Service is back online and ready!",
+    intent_classify_failed:
+      "Sorry, I couldn't classify your message. Please try again in a moment.",
   },
   chinese: {
     not_authorized: "您无权使用此机器人。",
@@ -161,6 +164,7 @@ const translations: Record<Lang, Record<MsgKey, string>> = {
     no_words_extracted: "无法从该句子中提取词汇。",
     service_shutting_down: "🔄 服务正在重启，请稍候！",
     service_back_online: "✅ 服务已恢复，随时可用！",
+    intent_classify_failed: "抱歉，我暂时无法理解你的消息，请稍后再试。",
   },
 };
 
