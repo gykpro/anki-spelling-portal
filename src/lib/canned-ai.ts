@@ -1,4 +1,4 @@
-import { CANNED_BY_WORD, CANNED_DEFAULT } from "../../tests/fixtures/canned-enrichment";
+import { CANNED_BY_WORD, CANNED_DEFAULT } from "./canned-enrichment";
 import type { ImageInput } from "./ai";
 
 /**
