@@ -33,9 +33,9 @@ A local web portal for managing Anki spelling cards from school worksheets, powe
 - Auto-enrichment pipeline (text + audio + images)
 - Per-user language preference via `/lang` command
 
-### Multi-Profile Distribution
-- Distribute cards to multiple Anki profiles on save
-- Media files (audio, images) copied to each profile
+### Multi-Instance Distribution
+- Copy cards from the central Anki instance to target AnkiConnect endpoints
+- Uses temporary `.apkg` export/import so media files travel with the cards
 
 ### Smart Completeness Tracking
 - Per-field completeness filters on Browse page
@@ -56,13 +56,17 @@ npm run dev
 
 Open `http://localhost:3000` and configure API keys via the **Settings** page (`/settings`).
 
+For a fresh Anki instance, place the schema seed package at
+`src/app/assets/anki_init.apkg`. The app imports it automatically before the
+first write if the required decks or note types are missing.
+
 ## Quick Start (Docker)
 
 ```bash
 docker compose up -d
 ```
 
-This starts both a headless Anki instance (with AnkiConnect) and the portal. Configure API keys at `http://localhost:3000/settings`.
+This starts a central headless Anki instance, two target Anki instances, and the portal. Configure API keys at `http://localhost:3000/settings`.
 
 For NAS deployment details, see [docs/nas-setup.md](docs/nas-setup.md).
 
@@ -77,7 +81,7 @@ All API keys are managed via the Settings page (`/settings`). No environment var
 | Gemini API | Cartoon image generation | Optional |
 | Telegram Bot Token | Telegram bot integration | Optional |
 
-The only environment variable is `ANKI_CONNECT_URL` (default: `http://localhost:8765`), used in Docker to point to the headless Anki container.
+`ANKI_CONNECT_URL` points the portal at the central Anki instance. Optional `DISTRIBUTION_ENDPOINTS` and `EXPORT_SHARED_PATH` configure target AnkiConnect endpoints and the shared `.apkg` transfer directory.
 
 ## CLI Skill
 

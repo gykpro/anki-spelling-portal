@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { ankiConnect } from "@/lib/anki-connect";
+import { ankiConnect, createAnkiClient } from "@/lib/anki-connect";
+import { getDistributionEndpoints } from "@/lib/distribution";
 import { getAllLanguages } from "@/lib/languages";
 
 export async function GET() {
@@ -13,6 +14,11 @@ export async function GET() {
       string,
       { deck: boolean; model: boolean }
     >,
+    distributionEndpoints: [] as {
+      url: string;
+      ankiConnect: boolean;
+      ankiVersion: number | null;
+    }[],
   };
 
   try {
@@ -38,11 +44,28 @@ export async function GET() {
     // AnkiConnect not reachable
   }
 
+  for (const endpoint of getDistributionEndpoints()) {
+    const client = createAnkiClient(endpoint);
+    const endpointCheck = {
+      url: endpoint,
+      ankiConnect: false,
+      ankiVersion: null as number | null,
+    };
+    try {
+      endpointCheck.ankiVersion = await client.version();
+      endpointCheck.ankiConnect = true;
+    } catch {
+      // Target endpoint not reachable.
+    }
+    checks.distributionEndpoints.push(endpointCheck);
+  }
+
   const allGood =
     checks.ankiConnect &&
     languages.some(
       (l) => checks.languages[l.id]?.deck && checks.languages[l.id]?.model
-    );
+    ) &&
+    checks.distributionEndpoints.every((endpoint) => endpoint.ankiConnect);
 
   return NextResponse.json({ ok: allGood, checks });
 }

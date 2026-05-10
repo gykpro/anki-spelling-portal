@@ -66,7 +66,7 @@ export interface UpdateNoteParams {
 }
 
 export interface DistributeResult {
-  profile: string;
+  target: string;
   success: boolean;
   error?: string;
   notesDistributed: number;

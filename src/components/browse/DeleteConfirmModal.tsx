@@ -33,7 +33,7 @@ export function DeleteConfirmModal({ words, onConfirm, onCancel }: DeleteConfirm
         </div>
 
         <p className="mt-3 text-sm text-muted-foreground">
-          This will permanently delete these cards from <strong>all profiles</strong>. This cannot be undone.
+          This will permanently delete these cards from the central instance and configured target endpoints. This cannot be undone.
         </p>
 
         {/* Word list */}

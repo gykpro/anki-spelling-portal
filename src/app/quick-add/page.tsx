@@ -243,7 +243,7 @@ export default function QuickAddPage() {
       setResult({ ...data.summary, noteIds });
       setPhase("done");
 
-      // Distribute to target profiles if any selected
+      // Distribute to configured target endpoints if available
       const targets = distTargetsRef.current;
       if (noteIds.length > 0 && targets.length > 0) {
         setDistributing(true);
@@ -251,10 +251,7 @@ export default function QuickAddPage() {
           const distRes = await fetch("/api/anki/distribute", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              noteIds,
-              targetProfiles: targets,
-            }),
+            body: JSON.stringify({ noteIds }),
           });
           if (distRes.ok) {
             const distData = await distRes.json();
