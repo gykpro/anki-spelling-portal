@@ -1,15 +1,46 @@
 services:
-  anki:
+  anki-central:
     image: thisisnttheway/headless-anki:latest
-    container_name: anki-headless
+    container_name: anki-central
     environment:
       QT_QPA_PLATFORM: vnc
       ANKICONNECT_WILDCARD_ORIGIN: "1"
     volumes:
-      - anki-data:/data
+      - anki-central-data:/data
+      - shared-exports:/exports
     ports:
       - "8765:8765"
       - "5900:5900"  # VNC — for AnkiWeb login and debugging
+    restart: unless-stopped
+    mem_limit: 512m
+
+  anki-child-1:
+    image: thisisnttheway/headless-anki:latest
+    container_name: anki-child-1
+    environment:
+      QT_QPA_PLATFORM: vnc
+      ANKICONNECT_WILDCARD_ORIGIN: "1"
+    volumes:
+      - anki-child-1-data:/data
+      - shared-exports:/exports
+    ports:
+      - "8766:8765"
+      - "5901:5900"
+    restart: unless-stopped
+    mem_limit: 512m
+
+  anki-child-2:
+    image: thisisnttheway/headless-anki:latest
+    container_name: anki-child-2
+    environment:
+      QT_QPA_PLATFORM: vnc
+      ANKICONNECT_WILDCARD_ORIGIN: "1"
+    volumes:
+      - anki-child-2-data:/data
+      - shared-exports:/exports
+    ports:
+      - "8767:8765"
+      - "5902:5900"
     restart: unless-stopped
     mem_limit: 512m
 
@@ -20,14 +51,22 @@ services:
     container_name: spelling-portal
     init: true
     environment:
-      ANKI_CONNECT_URL: http://anki:8765
+      ANKI_CONNECT_URL: http://anki-central:8765
+      DISTRIBUTION_ENDPOINTS: http://anki-child-1:8765,http://anki-child-2:8765
+      EXPORT_SHARED_PATH: /exports
     volumes:
       - ./data:/app/data
+      - shared-exports:/exports
     ports:
       - "3000:3000"
     depends_on:
-      - anki
+      - anki-central
+      - anki-child-1
+      - anki-child-2
     restart: unless-stopped
 
 volumes:
-  anki-data:
+  anki-central-data:
+  anki-child-1-data:
+  anki-child-2-data:
+  shared-exports:

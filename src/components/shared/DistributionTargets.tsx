@@ -5,74 +5,58 @@ import { Share2, Check, AlertCircle, Loader2 } from "lucide-react";
 import type { DistributeResult } from "@/types/anki";
 
 interface DistributionTargetsProps {
-  /** Pre-loaded profiles to choose from. If omitted, fetches from API. */
-  profiles?: string[];
+  /** Pre-loaded target endpoints to show. If omitted, reads configured endpoints from settings. */
+  endpoints?: string[];
   selected: string[];
   onChange: (selected: string[]) => void;
 }
 
-/** Checkbox selector for distribution target profiles */
+/** Read-only display of configured distribution target endpoints. */
 export function DistributionTargets({
-  profiles: propProfiles,
+  endpoints: propEndpoints,
   selected,
   onChange,
 }: DistributionTargetsProps) {
-  const [profiles, setProfiles] = useState<string[]>(propProfiles || []);
-  const [activeProfile, setActiveProfile] = useState<string | null>(null);
+  const [endpoints, setEndpoints] = useState<string[]>(propEndpoints || []);
 
   useEffect(() => {
-    if (propProfiles) return;
-    fetch("/api/anki/profiles")
+    if (propEndpoints) {
+      onChange(propEndpoints);
+      return;
+    }
+    fetch("/api/settings")
       .then((r) => r.json())
-      .then((data) => {
-        setActiveProfile(data.active);
-        // Get distribution profiles from settings
-        fetch("/api/settings")
-          .then((r) => r.json())
-          .then((settings) => {
-            const distValue = settings.settings?.DISTRIBUTION_PROFILES?.maskedValue || "";
-            if (distValue) {
-              const targets = distValue
-                .split(",")
-                .map((s: string) => s.trim())
-                .filter(Boolean);
-              setProfiles(targets);
-              // Auto-select all distribution targets
-              onChange(targets);
-            }
-          })
-          .catch(() => {});
+      .then((settings) => {
+        const distValue = settings.settings?.DISTRIBUTION_ENDPOINTS?.maskedValue || "";
+        const targets = distValue
+          .split(",")
+          .map((s: string) => s.trim())
+          .filter(Boolean);
+        setEndpoints(targets);
+        onChange(targets);
       })
       .catch(() => {});
-  }, [propProfiles]);
+  }, [propEndpoints, onChange]);
 
-  if (profiles.length === 0) return null;
-
-  const toggle = (profile: string) => {
-    if (selected.includes(profile)) {
-      onChange(selected.filter((p) => p !== profile));
-    } else {
-      onChange([...selected, profile]);
-    }
-  };
+  if (endpoints.length === 0) return null;
 
   return (
     <div className="flex items-center gap-2 text-xs">
       <Share2 className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-      <span className="text-muted-foreground shrink-0">Distribute to:</span>
-      {profiles.map((p) => (
-        <button
-          key={p}
-          onClick={() => toggle(p)}
-          className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 transition-colors ${
-            selected.includes(p)
+      <span className="text-muted-foreground shrink-0">Copy to:</span>
+      {endpoints.map((endpoint) => (
+        <span
+          key={endpoint}
+          title={endpoint}
+          className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 ${
+            selected.includes(endpoint)
               ? "border-primary bg-primary/10 text-primary"
-              : "border-border text-muted-foreground hover:bg-muted"
+              : "border-border text-muted-foreground"
           }`}
         >
-          {selected.includes(p) && <Check className="h-3 w-3" />}
-          {p}
-        </button>
+          <Check className="h-3 w-3" />
+          {endpoint}
+        </span>
       ))}
     </div>
   );
@@ -102,7 +86,7 @@ export function DistributionStatus({
       <Share2 className="h-3.5 w-3.5 text-muted-foreground" />
       {results.map((r) => (
         <span
-          key={r.profile}
+          key={r.target}
           className={`inline-flex items-center gap-1 ${
             r.success ? "text-success" : "text-destructive"
           }`}
@@ -112,7 +96,7 @@ export function DistributionStatus({
           ) : (
             <AlertCircle className="h-3 w-3" />
           )}
-          {r.profile}
+          {r.target}
           {r.success && r.notesDistributed > 0 && (
             <span className="text-muted-foreground">({r.notesDistributed})</span>
           )}

@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ankiConnect, withProfileLock } from "@/lib/anki-connect";
+import { ankiConnect } from "@/lib/anki-connect";
 import { writeQueue } from "@/lib/write-queue";
-import type { CreateNoteParams, DistributeResult } from "@/types/anki";
+import type { CreateNoteParams } from "@/types/anki";
 import { getLanguageById, getLanguageByNoteType } from "@/lib/languages";
-import { getConfig } from "@/lib/settings";
+import { deleteFromEndpoints } from "@/lib/distribution";
+import { ensureAnkiSchema } from "@/lib/anki-init";
 
 /** GET: Search for notes in a spelling deck */
 export async function GET(request: NextRequest) {
@@ -58,7 +59,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-/** DELETE: Delete notes from all profiles by Note ID */
+/** DELETE: Delete notes from central Anki and configured endpoints by Note ID */
 export async function DELETE(request: NextRequest) {
   try {
     const { noteIds } = await request.json();
@@ -90,64 +91,13 @@ export async function DELETE(request: NextRequest) {
       const lang = getLanguageByNoteType(firstNote.modelName);
       const deckName = lang?.deck ?? firstNote.modelName;
 
-      // Delete from home profile
+      // Delete from central instance
       await ankiConnect.deleteNotes(noteIds);
       const homeDeleted = noteIds.length;
 
-      // Delete from target profiles
-      const homeProfile = getConfig("ACTIVE_PROFILE");
-      const distProfilesStr = getConfig("DISTRIBUTION_PROFILES");
-      const targetProfiles = distProfilesStr
-        ? distProfilesStr.split(",").map((p) => p.trim()).filter(Boolean)
-        : [];
+      const endpointResults = await deleteFromEndpoints(uuids, deckName);
 
-      const profileResults: DistributeResult[] = [];
-
-      if (homeProfile && uuids.length > 0) {
-        for (const targetProfile of targetProfiles) {
-          if (targetProfile === homeProfile) continue;
-
-          const profileResult = await withProfileLock(async () => {
-            try {
-              await ankiConnect.loadProfileAndWait(targetProfile);
-
-              let deleted = 0;
-              for (const uuid of uuids) {
-                const found = await ankiConnect.findNotes(
-                  `deck:"${deckName}" "${uuid}"`
-                );
-                if (found.length > 0) {
-                  await ankiConnect.deleteNotes(found);
-                  deleted += found.length;
-                }
-              }
-
-              await ankiConnect.loadProfileAndWait(homeProfile);
-
-              return {
-                profile: targetProfile,
-                success: true,
-                notesDistributed: deleted,
-              };
-            } catch (err) {
-              try {
-                await ankiConnect.loadProfileAndWait(homeProfile);
-              } catch { /* ignore */ }
-
-              return {
-                profile: targetProfile,
-                success: false,
-                error: err instanceof Error ? err.message : "Deletion failed",
-                notesDistributed: 0,
-              };
-            }
-          });
-
-          profileResults.push(profileResult);
-        }
-      }
-
-      return { homeDeleted, profileResults };
+      return { homeDeleted, endpointResults };
     });
 
     return NextResponse.json(result);
@@ -178,6 +128,7 @@ export async function POST(request: NextRequest) {
 
     const { results, created, failed } = await writeQueue.enqueue(async () => {
       await ankiConnect.syncBeforeWrite();
+      await ensureAnkiSchema(ankiConnect);
       await ankiConnect.createDeck(notes[0].deckName);
       const r = await ankiConnect.addNotes(notes);
       return {
