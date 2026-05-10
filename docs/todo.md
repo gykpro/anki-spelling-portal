@@ -11,6 +11,7 @@
 - [x] **Claude Code Enrichment Skill** — Distributable skill in `skill/` exposing the enrichment API as CLI scripts. Supports text enrichment, audio/image generation, full pipeline, and worksheet extraction. SKILL.md provides intent-to-script mapping for conversational use.
 
 ## In Progress
+- [ ] **Multi-Instance Export/Import Distribution** — Replace profile-switching with separate Anki instances per account. Distribution via .apkg export/import (temp deck transport). Central instance is source of truth. Soft cut-over: legacy cards keep mismatched IDs.
 
 ## Pending
 - [ ] **Tech debt: deduplicate cloze/main-sentence regex** — `src/app/quick-add/page.tsx:38-39`, `src/app/enrich/page.tsx:582-586` and `:1274-1278`, `skill/scripts/lib/anki-fields.mjs:24-28` each inline the same regex logic as `buildMainSentence` / `buildCloze` in `src/lib/card-builder.ts`. Refactor them to share the library function so the wrapping convention lives in one place. Intentionally deferred from the long-phrase split feature to keep that change scoped.
