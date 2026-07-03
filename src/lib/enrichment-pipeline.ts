@@ -178,6 +178,9 @@ export async function generateTTS(
 
 // ─── Image generation ───
 
+const IMAGE_GEN_ATTEMPTS = 2; // 1 retry on transient Gemini failures
+const IMAGE_GEN_RETRY_DELAY_MS = 1000;
+
 export async function generateImage(
   word: string,
   sentence: string
@@ -198,6 +201,25 @@ Requirements:
 - Keep the composition simple and uncluttered — one clear focal point
 - The illustration should help a 10-year-old understand and remember the word "${word}"`;
 
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= IMAGE_GEN_ATTEMPTS; attempt++) {
+    try {
+      return await requestGeminiImage(prompt, apiKey);
+    } catch (err) {
+      lastError = err;
+      if (attempt < IMAGE_GEN_ATTEMPTS) {
+        console.warn(`[ImageGen] Attempt ${attempt} failed for "${word}", retrying:`, err);
+        await new Promise((r) => setTimeout(r, IMAGE_GEN_RETRY_DELAY_MS));
+      }
+    }
+  }
+  throw lastError;
+}
+
+async function requestGeminiImage(
+  prompt: string,
+  apiKey: string
+): Promise<{ base64: string; mimeType: string }> {
   const res = await fetch(
     "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent",
     {

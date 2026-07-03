@@ -8,6 +8,11 @@ import { getConfig } from "./settings";
 // Resolve claude binary path — use absolute path in Docker where PATH may not include it
 const CLAUDE_BIN = existsSync("/usr/local/bin/claude") ? "/usr/local/bin/claude" : "claude";
 
+// Pin the model explicitly — without this, extraction quality drifts with
+// whatever the environment's Claude CLI default model happens to be
+// (NAS Docker container vs dev machine have different defaults).
+const CLI_MODEL = "claude-opus-4-8";
+
 /**
  * Invoke the Claude Code CLI with a prompt piped via stdin.
  * Returns the parsed result text from the JSON output.
@@ -22,6 +27,7 @@ export function runClaude(prompt: string, options?: {
   return new Promise((resolve, reject) => {
     const args = [
       "-p",
+      "--model", CLI_MODEL,
       "--output-format", "json",
       "--max-budget-usd", String(maxBudget),
       "--no-session-persistence",

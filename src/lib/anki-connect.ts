@@ -51,6 +51,31 @@ export async function withProfileLock<T>(fn: () => Promise<T>): Promise<T> {
   }
 }
 
+/**
+ * AnkiConnect passes the target deck to Anki by mutating an in-memory cached
+ * notetype dict; when that cache is invalidated mid-add (sync, profile-switch
+ * reset), Anki falls back to the notetype's persisted deck id — which can be
+ * dangling and resolve to "Default". Verify placement after adding and move
+ * misplaced cards back to the requested deck. Best-effort: the note already
+ * exists, so guard failures must not fail the add.
+ */
+async function ensureCardsInDeck(noteIds: number[], deckName: string): Promise<void> {
+  if (noteIds.length === 0) return;
+  try {
+    const misplaced = await invoke<number[]>("findCards", {
+      query: `nid:${noteIds.join(",")} -deck:"${deckName}"`,
+    });
+    if (misplaced.length > 0) {
+      console.warn(
+        `[AnkiConnect] ${misplaced.length} card(s) landed outside "${deckName}", moving back`
+      );
+      await invoke("changeDeck", { cards: misplaced, deck: deckName });
+    }
+  } catch (err) {
+    console.warn(`[AnkiConnect] Deck placement guard failed for "${deckName}":`, err);
+  }
+}
+
 export const ankiConnect = {
   /** Check if AnkiConnect is reachable */
   async ping(): Promise<boolean> {
@@ -89,7 +114,7 @@ export const ankiConnect = {
 
   /** Add a single note */
   async addNote(params: CreateNoteParams): Promise<number> {
-    return invoke<number>("addNote", {
+    const noteId = await invoke<number>("addNote", {
       note: {
         deckName: params.deckName,
         modelName: params.modelName,
@@ -101,13 +126,15 @@ export const ankiConnect = {
         },
       },
     });
+    await ensureCardsInDeck([noteId], params.deckName);
+    return noteId;
   },
 
-  /** Add multiple notes at once */
+  /** Add multiple notes at once. All notes in a batch target the same deck. */
   async addNotes(
     notes: CreateNoteParams[]
   ): Promise<(number | null)[]> {
-    return invoke<(number | null)[]>("addNotes", {
+    const noteIds = await invoke<(number | null)[]>("addNotes", {
       notes: notes.map((n) => ({
         deckName: n.deckName,
         modelName: n.modelName,
@@ -119,6 +146,21 @@ export const ankiConnect = {
         },
       })),
     }, 120000);
+    const created = noteIds.filter((id): id is number => id !== null);
+    if (created.length > 0) {
+      await ensureCardsInDeck(created, notes[0].deckName);
+    }
+    return noteIds;
+  },
+
+  /** Find cards using Anki query syntax */
+  async findCards(query: string): Promise<number[]> {
+    return invoke<number[]>("findCards", { query });
+  },
+
+  /** Move cards to a deck */
+  async changeDeck(cards: number[], deck: string): Promise<void> {
+    await invoke("changeDeck", { cards, deck });
   },
 
   /** Update fields of an existing note */

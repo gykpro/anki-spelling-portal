@@ -1,6 +1,7 @@
 # Feature Roadmap
 
 ## Completed
+- [x] **2026-07-03 Bugfix bundle: deck placement guard / CLI model pin / image-gen retry** — (1) addNote/addNotes verify new cards landed in the requested deck and changeDeck misplaced ones back (root cause: dangling notetype `did` + AnkiConnect in-memory deck passing → cards intermittently fell into "Default"); (2) Claude CLI calls pin `--model claude-opus-4-8` so extraction quality doesn't drift with the environment's CLI default; (3) `generateImage` retries once (1s delay) on transient Gemini failures. Spec: `docs/superpowers/specs/2026-07-03-deck-guard-model-pin-image-retry.md`.
 - [x] **Feature 1: Duplicate Detection on Add** — Pre-check words against existing Anki notes before submission. Quick Add shows warning panel; upload flow shows "duplicate" badge.
 - [x] **Feature 2: Dashboard "Needs Attention" Section** — Show counts of cards with missing fields on the dashboard. One-click link to enrich them.
 - [x] **Feature 5: Auto-Enrich on Add** — After Quick Add, "Enrich N Cards" button navigates to enrich page with autoEnrich=true. Pipeline runs: text batch → save → audio per card → save. Progress banner shows each phase.
