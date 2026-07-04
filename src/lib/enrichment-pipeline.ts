@@ -3,8 +3,9 @@
  * Used by both API routes and Telegram bot.
  */
 import { runAI, runAIVision, type ImageInput } from "@/lib/ai";
-import { ankiConnect, withProfileLock } from "@/lib/anki-connect";
-import { getConfig } from "@/lib/settings";
+import { ankiConnect } from "@/lib/anki-connect";
+import { distributeToTargets } from "@/lib/distribution";
+import { getConfig, getDistributionTargets } from "@/lib/settings";
 import type { DistributeResult } from "@/types/anki";
 import {
   type TextEnrichField,
@@ -995,143 +996,17 @@ export async function runFullPipeline(
   return runPipeline(words, progress, lang);
 }
 
-// ─── Distribution to other profiles ───
+// ─── Distribution to target instances ───
 
-/** Distribute notes to configured target profiles (server-side) */
+/** Distribute notes to configured target instances (server-side). */
 export async function distributeNotes(
   noteIds: number[],
   progress?: PipelineProgress,
   mediaCache?: Map<string, string>
 ): Promise<DistributeResult[]> {
-  const distConfig = getConfig("DISTRIBUTION_PROFILES");
-  if (!distConfig) return [];
-
-  const targetProfiles = distConfig.split(",").map((s) => s.trim()).filter(Boolean);
-  if (targetProfiles.length === 0) return [];
-
-  const homeProfile = getConfig("ACTIVE_PROFILE");
-  if (!homeProfile) return [];
-
-  // Sync before distributing to ensure current profile is up-to-date
-  await ankiConnect.syncBeforeWrite();
-
-  // Fetch source notes
-  const sourceNotes = await ankiConnect.notesInfo(noteIds);
-  if (sourceNotes.length === 0) return [];
-
-  // Detect language from the first note's model name
-  const firstNote = sourceNotes[0];
-  const lang = getLanguageByNoteType(firstNote.modelName);
-  const deckName = lang?.deck ?? getLanguageById("english").deck;
-  const modelName = lang?.noteType ?? getLanguageById("english").noteType;
-
-  const results: DistributeResult[] = [];
-
-  for (const targetProfile of targetProfiles) {
-    if (targetProfile === homeProfile) continue;
-
-    console.log(`[Distribution] Starting distribution to "${targetProfile}"...`);
-    if (progress) {
-      await progress.update(`Distributing to ${targetProfile}...`);
-    }
-
-    const result = await withProfileLock(async () => {
-      try {
-        console.log(`[Distribution] Switching to profile "${targetProfile}"...`);
-        await ankiConnect.loadProfileAndWait(targetProfile);
-        console.log(`[Distribution] Switched to "${targetProfile}" successfully`);
-
-        const decks = await ankiConnect.deckNames();
-        if (!decks.includes(deckName)) {
-          console.log(`[Distribution] Deck "${deckName}" not found in "${targetProfile}", skipping`);
-          await ankiConnect.loadProfileAndWait(homeProfile);
-          return {
-            profile: targetProfile,
-            success: false,
-            error: `Deck "${deckName}" not found`,
-            notesDistributed: 0,
-          };
-        }
-
-        const models = await ankiConnect.modelNames();
-        if (!models.includes(modelName)) {
-          console.log(`[Distribution] Model "${modelName}" not found in "${targetProfile}", skipping`);
-          await ankiConnect.loadProfileAndWait(homeProfile);
-          return {
-            profile: targetProfile,
-            success: false,
-            error: `Note type "${modelName}" not found`,
-            notesDistributed: 0,
-          };
-        }
-
-        // Store media files in target profile
-        if (mediaCache && mediaCache.size > 0) {
-          console.log(`[Distribution] Storing ${mediaCache.size} media files in "${targetProfile}"...`);
-          for (const [filename, data] of mediaCache) {
-            try {
-              await ankiConnect.storeMediaFile(filename, data);
-            } catch (err) {
-              console.warn(`[Distribution] Failed to store media "${filename}" in "${targetProfile}":`, err);
-            }
-          }
-          // Allow Anki to finish internal media sync before proceeding
-          await new Promise((r) => setTimeout(r, 2000));
-        }
-
-        let distributed = 0;
-
-        for (const note of sourceNotes) {
-          const fields: Record<string, string> = {};
-          for (const [key, val] of Object.entries(note.fields)) {
-            fields[key] = val.value;
-          }
-
-          const uuid = fields["Note ID"];
-          if (!uuid) continue;
-
-          // Search by UUID text within the deck
-          const existing = await ankiConnect.findNotes(
-            `deck:"${deckName}" "${uuid}"`
-          );
-
-          if (existing.length > 0) {
-            await ankiConnect.updateNoteFields({ id: existing[0], fields });
-          } else {
-            try {
-              await ankiConnect.addNote({
-                deckName,
-                modelName,
-                fields,
-                tags: note.tags,
-              });
-            } catch {
-              continue;
-            }
-          }
-          distributed++;
-        }
-
-        console.log(`[Distribution] Distributed ${distributed} notes to "${targetProfile}", switching back...`);
-        await ankiConnect.loadProfileAndWait(homeProfile);
-        console.log(`[Distribution] Switched back to "${homeProfile}" successfully`);
-        return { profile: targetProfile, success: true, notesDistributed: distributed };
-      } catch (err) {
-        console.error(`[Distribution] Error distributing to "${targetProfile}":`, err);
-        try { await ankiConnect.loadProfileAndWait(homeProfile); } catch { /* ignore */ }
-        return {
-          profile: targetProfile,
-          success: false,
-          error: err instanceof Error ? err.message : "Distribution failed",
-          notesDistributed: 0,
-        };
-      }
-    });
-
-    results.push(result);
-  }
-
-  return results;
+  const targets = getDistributionTargets();
+  if (targets.length === 0) return [];
+  return distributeToTargets(noteIds, targets, mediaCache, progress);
 }
 
 /** Extract worksheet data from images using AI Vision. */

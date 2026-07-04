@@ -1,5 +1,13 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
+
+const getTargetsMock = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/settings", async (importOriginal) => {
+  const orig = await importOriginal<typeof import("@/lib/settings")>();
+  return { ...orig, getDistributionTargets: getTargetsMock };
+});
+
 import { distributeToTargets } from "@/lib/distribution";
+import { distributeNotes } from "@/lib/enrichment-pipeline";
 
 /**
  * Shared per-instance distribution flow (plan 2026-07-04, Task 3).
@@ -249,6 +257,37 @@ describe("distributeToTargets", () => {
     const calls = mockAnki({});
     expect(await distributeToTargets([], [TARGET])).toEqual([]);
     expect(await distributeToTargets([111], [])).toEqual([]);
+    expect(calls).toHaveLength(0);
+  });
+});
+
+describe("distributeNotes wiring (enrichment pipeline)", () => {
+  it("reads DISTRIBUTION_TARGETS and distributes to each", async () => {
+    getTargetsMock.mockReturnValue([
+      { name: "Gao Yi", url: "http://localhost:8771" },
+    ]);
+    mockAnki({
+      "*": sourceHandlers(),
+      "http://localhost:8771": {
+        modelNames: () => ["school Chinese spelling"],
+        deckNames: () => ["Gao Chinese"],
+        findNotes: () => [],
+        addNote: () => 999,
+        findCards: () => [],
+        sync: () => null,
+      },
+    });
+
+    const results = await distributeNotes([111]);
+    expect(results).toEqual([
+      { profile: "Gao Yi", success: true, notesDistributed: 1 },
+    ]);
+  });
+
+  it("returns [] when no targets configured, without any network call", async () => {
+    getTargetsMock.mockReturnValue([]);
+    const calls = mockAnki({});
+    expect(await distributeNotes([111])).toEqual([]);
     expect(calls).toHaveLength(0);
   });
 });
