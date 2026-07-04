@@ -78,6 +78,17 @@
 
    注意：全库几百张卡时该请求会运行数分钟（同步等待），curl 请把超时设大（`--max-time 1800`）。响应：`{ notesScanned, results: [{ profile, success, notesDistributed }] }`。
 
+### 4.1 对账（上线前后各跑一次，只读）
+
+```bash
+curl -s "http://<portal>/api/anki/reconcile" | python3 -m json.tool
+# 只看某个目标：curl -s "http://<portal>/api/anki/reconcile?target=Gao%20Yi"
+```
+
+返回每个目标、每个 deck 的差异：`missingOnTarget`（主库有、从库缺 —— 再分发会补）、
+`extraOnTarget`（从库有、主库没有 —— 系统不动，人工决定）、`wordMismatches`、
+以及两侧的 `duplicateUuids`（重复卡清单）。**该接口只读，不做任何修改。**
+
 ## 5. 回滚
 
 - 门户回滚到 `v0.9.16` 镜像 = 回到 profile 切换架构，需同时恢复旧配置（`ACTIVE_PROFILE`/`DISTRIBUTION_PROFILES`）并指回多 profile 单实例。三实例容器与 v0.9.16 不兼容。
