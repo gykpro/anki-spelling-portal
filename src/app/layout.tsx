@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import "./globals.css";
-import { ProfileIndicator } from "@/components/shared/ProfileIndicator";
 import { SidebarNav } from "@/components/shared/SidebarNav";
 
 export const metadata: Metadata = {
@@ -24,7 +23,6 @@ export default function RootLayout({
               <h1 className="text-sm font-bold tracking-tight">
                 Spelling Portal
               </h1>
-              <ProfileIndicator />
             </div>
             <Suspense>
               <SidebarNav />

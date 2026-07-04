@@ -7,24 +7,6 @@ import type {
 } from "@/types/anki";
 import { getConfig } from "./settings";
 
-// Profile-switching mutex: serialize all profile switches
-let profileLock: Promise<void> = Promise.resolve();
-
-export async function withProfileLock<T>(fn: () => Promise<T>): Promise<T> {
-  let release: () => void;
-  const myLock = new Promise<void>((r) => {
-    release = r;
-  });
-  const prev = profileLock;
-  profileLock = myLock;
-  await prev;
-  try {
-    return await fn();
-  } finally {
-    release!();
-  }
-}
-
 /**
  * Create an AnkiConnect client bound to a specific instance URL.
  * Without a URL, the client follows getConfig("ANKI_CONNECT_URL") dynamically
@@ -243,59 +225,6 @@ export function createAnkiClient(urlOverride?: string) {
     /** Add tags to notes */
     async addTags(notes: number[], tags: string): Promise<void> {
       await invoke("addTags", { notes, tags });
-    },
-
-    /** Get all Anki profile names */
-    async getProfiles(): Promise<string[]> {
-      return invoke<string[]>("getProfiles");
-    },
-
-    /** Load/switch to a specific profile */
-    async loadProfile(name: string): Promise<boolean> {
-      return invoke<boolean>("loadProfile", { name });
-    },
-
-    /**
-     * Load a profile and wait until AnkiConnect is fully ready on the new profile.
-     * AnkiConnect's loadProfile returns immediately but the actual switch takes
-     * several seconds. We snapshot deck names before switching, then poll until
-     * they change (confirming the new profile is loaded).
-     */
-    async loadProfileAndWait(name: string, maxWaitMs = 15000): Promise<void> {
-      const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
-      // Snapshot current deck names to detect when the switch actually happens
-      let decksBefore: string[] = [];
-      try {
-        decksBefore = await invoke<string[]>("deckNames");
-      } catch {
-        // If we can't get decks (Anki transitioning), that's ok
-      }
-
-      // Issue the profile switch
-      await invoke("loadProfile", { name });
-
-      // Wait for Anki to actually complete the switch.
-      await delay(2000);
-
-      const start = Date.now();
-      while (Date.now() - start < maxWaitMs) {
-        try {
-          const decksNow = await invoke<string[]>("deckNames");
-          if (JSON.stringify(decksNow) !== JSON.stringify(decksBefore)) {
-            await delay(1000); // Let Anki fully settle after switch
-            return;
-          }
-          if (Date.now() - start >= 3000) {
-            await delay(1000); // Let Anki fully settle
-            return;
-          }
-        } catch {
-          // AnkiConnect not ready yet during transition
-        }
-        await delay(500);
-      }
-      await delay(1000); // Let Anki fully settle even on timeout path
     },
 
     /** Request a sync */

@@ -11,37 +11,32 @@ interface DistributionTargetsProps {
   onChange: (selected: string[]) => void;
 }
 
-/** Checkbox selector for distribution target profiles */
+/** Checkbox selector for distribution target instances */
 export function DistributionTargets({
   profiles: propProfiles,
   selected,
   onChange,
 }: DistributionTargetsProps) {
   const [profiles, setProfiles] = useState<string[]>(propProfiles || []);
-  const [activeProfile, setActiveProfile] = useState<string | null>(null);
 
   useEffect(() => {
     if (propProfiles) return;
-    fetch("/api/anki/profiles")
+    fetch("/api/settings")
       .then((r) => r.json())
-      .then((data) => {
-        setActiveProfile(data.active);
-        // Get distribution profiles from settings
-        fetch("/api/settings")
-          .then((r) => r.json())
-          .then((settings) => {
-            const distValue = settings.settings?.DISTRIBUTION_PROFILES?.maskedValue || "";
-            if (distValue) {
-              const targets = distValue
-                .split(",")
-                .map((s: string) => s.trim())
-                .filter(Boolean);
-              setProfiles(targets);
-              // Auto-select all distribution targets
-              onChange(targets);
-            }
-          })
-          .catch(() => {});
+      .then((settings) => {
+        // DISTRIBUTION_TARGETS is "Name=URL, Name2=URL2" — show the names
+        const raw = settings.settings?.DISTRIBUTION_TARGETS?.maskedValue || "";
+        const names = raw
+          .split(",")
+          .map((s: string) => s.trim())
+          .filter(Boolean)
+          .map((entry: string) => entry.split("=")[0]?.trim())
+          .filter(Boolean);
+        if (names.length > 0) {
+          setProfiles(names);
+          // Auto-select all distribution targets
+          onChange(names);
+        }
       })
       .catch(() => {});
   }, [propProfiles]);

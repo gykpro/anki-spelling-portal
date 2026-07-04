@@ -15,9 +15,7 @@ const CONFIG_KEYS = {
   AI_BACKEND: { secret: false, envAllowed: false, description: "AI backend: auto, sdk, or cli", default: "auto" },
   TELEGRAM_BOT_TOKEN: { secret: true, envAllowed: false, description: "Telegram Bot API token from @BotFather" },
   TELEGRAM_ALLOWED_USERS: { secret: false, envAllowed: false, description: "Comma-separated Telegram user IDs allowed to use the bot" },
-  DISTRIBUTION_PROFILES: { secret: false, envAllowed: false, description: "Comma-separated profile names to distribute cards to" },
   DISTRIBUTION_TARGETS: { secret: false, envAllowed: false, description: "Distribution targets as Name=URL pairs, comma-separated (e.g. Gao Tian=http://localhost:8770)" },
-  ACTIVE_PROFILE: { secret: false, envAllowed: false, description: "Currently active Anki profile name" },
 } as const;
 
 export type ConfigKey = keyof typeof CONFIG_KEYS;
