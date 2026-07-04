@@ -16,6 +16,7 @@ const CONFIG_KEYS = {
   TELEGRAM_BOT_TOKEN: { secret: true, envAllowed: false, description: "Telegram Bot API token from @BotFather" },
   TELEGRAM_ALLOWED_USERS: { secret: false, envAllowed: false, description: "Comma-separated Telegram user IDs allowed to use the bot" },
   DISTRIBUTION_PROFILES: { secret: false, envAllowed: false, description: "Comma-separated profile names to distribute cards to" },
+  DISTRIBUTION_TARGETS: { secret: false, envAllowed: false, description: "Distribution targets as Name=URL pairs, comma-separated (e.g. Gao Tian=http://localhost:8770)" },
   ACTIVE_PROFILE: { secret: false, envAllowed: false, description: "Currently active Anki profile name" },
 } as const;
 
@@ -154,4 +155,25 @@ export function getAIBackend(): "sdk" | "cli" | "canned" | "none" {
   if (getConfig("ANTHROPIC_API_KEY")) return "sdk";
   if (getConfig("CLAUDE_CODE_OAUTH_TOKEN")) return "cli";
   return "none";
+}
+
+/** Parse DISTRIBUTION_TARGETS ("Name=URL, Name2=URL2") into typed targets. */
+export function getDistributionTargets(
+  raw: string = getConfig("DISTRIBUTION_TARGETS")
+): { name: string; url: string }[] {
+  if (!raw) return [];
+  const targets: { name: string; url: string }[] = [];
+  for (const entry of raw.split(",")) {
+    const trimmed = entry.trim();
+    if (!trimmed) continue;
+    const eq = trimmed.indexOf("=");
+    const name = eq > 0 ? trimmed.slice(0, eq).trim() : "";
+    const url = eq > 0 ? trimmed.slice(eq + 1).trim() : "";
+    if (!name || !url) {
+      console.warn(`[Settings] Skipping malformed DISTRIBUTION_TARGETS entry: "${trimmed}"`);
+      continue;
+    }
+    targets.push({ name, url });
+  }
+  return targets;
 }
