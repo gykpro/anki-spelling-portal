@@ -1,5 +1,8 @@
 # Feature Roadmap
 
+## In Progress
+- [ ] **Per-Instance Distribution** — replace profile-switching distribution with dedicated Anki instances per profile (fixed AnkiConnect URLs); auto-provision deck/notetype on receivers; remove profile-switching machinery and delete propagation. Spec: `docs/superpowers/specs/2026-07-04-per-instance-distribution-design.md`.
+
 ## Completed
 - [x] **2026-07-03 Bugfix bundle: deck placement guard / CLI model pin / image-gen retry** — (1) addNote/addNotes verify new cards landed in the requested deck and changeDeck misplaced ones back (root cause: dangling notetype `did` + AnkiConnect in-memory deck passing → cards intermittently fell into "Default"); (2) Claude CLI calls pin `--model claude-opus-4-8` so extraction quality doesn't drift with the environment's CLI default; (3) `generateImage` retries once (1s delay) on transient Gemini failures. Spec: `docs/superpowers/specs/2026-07-03-deck-guard-model-pin-image-retry.md`.
 - [x] **Feature 1: Duplicate Detection on Add** — Pre-check words against existing Anki notes before submission. Quick Add shows warning panel; upload flow shows "duplicate" badge.
@@ -10,8 +13,6 @@
 - [x] **Feature 6: Telegram Bot Integration** — Telegram bot via grammy (long-polling) that accepts words or worksheet photos, creates cards, and auto-enriches with text, audio, and images. Runs inside Next.js via instrumentation.ts. Access control via allowed user IDs in Settings.
 - [x] **Anki Sync Before Save + Manual Sync** — Auto-sync before all write operations to prevent conflicts across devices. Manual "Sync" button on Dashboard with spinner and success/error feedback.
 - [x] **Claude Code Enrichment Skill** — Distributable skill in `skill/` exposing the enrichment API as CLI scripts. Supports text enrichment, audio/image generation, full pipeline, and worksheet extraction. SKILL.md provides intent-to-script mapping for conversational use.
-
-## In Progress
 
 ## Pending
 - [ ] **Tech debt: deduplicate cloze/main-sentence regex** — `src/app/quick-add/page.tsx:38-39`, `src/app/enrich/page.tsx:582-586` and `:1274-1278`, `skill/scripts/lib/anki-fields.mjs:24-28` each inline the same regex logic as `buildMainSentence` / `buildCloze` in `src/lib/card-builder.ts`. Refactor them to share the library function so the wrapping convention lives in one place. Intentionally deferred from the long-phrase split feature to keep that change scoped.
