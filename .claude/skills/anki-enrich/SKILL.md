@@ -49,7 +49,7 @@ Match the user's intent to the appropriate script:
 | Enrich Chinese words | `enrich-full.mjs` | "enrich 勇敢 and 智慧" |
 | Extract words from worksheet photos | `extract-worksheet.mjs` | "extract words from this worksheet photo" |
 | Extract AND enrich from worksheets | `extract-worksheet.mjs --enrich` | "process this spelling worksheet" |
-| Delete cards from all profiles | Portal API: `DELETE /api/anki/notes` | "delete these cards" |
+| Delete cards (source instance only) | Portal API: `DELETE /api/anki/notes` | "delete these cards" |
 | Clear enrichment fields for re-generation | Portal API: `POST /api/anki/notes/clear-fields` | "clear the definitions so I can re-enrich" |
 
 **Default**: If the user just says "enrich [words]" without specifying what, use `enrich-full.mjs`.
@@ -130,7 +130,7 @@ Supported image formats: JPEG, PNG, GIF, WebP. **PDFs are not supported** by the
 ## Limitations
 
 - **No PDF extraction**: Worksheet extraction only accepts image files. Use the portal UI or Telegram bot for PDFs.
-- **Multi-profile distribution**: When cards are saved through the portal API, they are automatically distributed to all configured target profiles. No extra steps needed from the skill scripts.
+- **Multi-instance distribution**: When cards are saved through the portal API, they are automatically distributed to all configured target Anki instances (`DISTRIBUTION_TARGETS` in Settings, `Name=URL` pairs). No extra steps needed from the skill scripts.
 
 ## Output Format
 
@@ -162,16 +162,18 @@ If you see "Cannot reach Anki portal", the portal server isn't running or `confi
 
 These operations are available via the portal REST API (no dedicated script needed).
 
-### Delete notes across all profiles
+### Delete notes (source instance only)
 ```bash
 curl -X DELETE http://localhost:3001/api/anki/notes \
   -H "Content-Type: application/json" \
   -d '{"noteIds": [1234567890, 1234567891]}'
 ```
 
-Response: `{ "homeDeleted": 2, "profileResults": [{ "profile": "...", "success": true, "notesDistributed": 2 }] }`
+Response: `{ "homeDeleted": 2 }`
 
-Deletes notes from the active profile and all configured distribution target profiles (matched by Note ID UUID).
+Deletes notes on the source instance only. Deletion does NOT propagate to
+distribution targets — libraries can drift apart, so removing a duplicate here
+must never delete the only copy on another instance.
 
 ### Clear enrichment fields
 ```bash
