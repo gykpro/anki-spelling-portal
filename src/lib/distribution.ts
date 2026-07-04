@@ -1,9 +1,18 @@
 import { ankiConnect, createAnkiClient, type AnkiClient } from "@/lib/anki-connect";
-import { getLanguageByNoteType, getLanguageById } from "@/lib/languages";
+import { getAllLanguages, getLanguageByNoteType, getLanguageById } from "@/lib/languages";
 import type { AnkiNote, DistributeResult } from "@/types/anki";
 
 export type DistributionTarget = { name: string; url: string };
 export type DistributionProgress = { update(msg: string): Promise<void> };
+export type DistributeOptions = {
+  /**
+   * When a note is ADDED on a target (not updated), copy the media files its
+   * fields reference from the source's media folder to the target. Used by
+   * re-distribution of historical notes, whose media isn't in any in-memory
+   * cache. The update path never copies (existing cards already have media).
+   */
+  copyMediaOnAdd?: boolean;
+};
 
 /**
  * Distribute source notes to dedicated per-profile Anki instances.
@@ -14,7 +23,8 @@ export async function distributeToTargets(
   noteIds: number[],
   targets: DistributionTarget[],
   mediaCache?: Map<string, string>,
-  progress?: DistributionProgress
+  progress?: DistributionProgress,
+  options?: DistributeOptions
 ): Promise<DistributeResult[]> {
   if (noteIds.length === 0 || targets.length === 0) return [];
 
@@ -29,10 +39,86 @@ export async function distributeToTargets(
   for (const target of targets) {
     if (progress) await progress.update(`Distributing to ${target.name}...`);
     results.push(
-      await distributeToTarget(target, sourceNotes, deckName, modelName, mediaCache)
+      await distributeToTarget(target, sourceNotes, deckName, modelName, mediaCache, options)
     );
   }
   return results;
+}
+
+/**
+ * Re-distribute every note in both language decks to the given targets, in
+ * batches. Heals historical distribution gaps: missing notes are added with
+ * their media copied from the source; existing notes get field updates.
+ */
+export async function redistributeAll(
+  targets: DistributionTarget[],
+  progress?: DistributionProgress,
+  batchSize = 25
+): Promise<{ notesScanned: number; results: DistributeResult[] }> {
+  const totals = new Map<string, DistributeResult>();
+  for (const t of targets) {
+    totals.set(t.name, { profile: t.name, success: true, notesDistributed: 0 });
+  }
+
+  let notesScanned = 0;
+  for (const lang of getAllLanguages()) {
+    const noteIds = await ankiConnect.findNotes(`deck:"${lang.deck}"`);
+    notesScanned += noteIds.length;
+
+    for (let i = 0; i < noteIds.length; i += batchSize) {
+      const chunk = noteIds.slice(i, i + batchSize);
+      if (progress) {
+        await progress.update(
+          `[${lang.label}] Re-distributing ${i + 1}-${Math.min(i + batchSize, noteIds.length)}/${noteIds.length}...`
+        );
+      }
+      const results = await distributeToTargets(chunk, targets, undefined, undefined, {
+        copyMediaOnAdd: true,
+      });
+      for (const r of results) {
+        const agg = totals.get(r.profile);
+        if (!agg) continue;
+        agg.notesDistributed += r.notesDistributed;
+        if (!r.success) {
+          agg.success = false;
+          if (!agg.error) agg.error = r.error;
+        }
+      }
+    }
+  }
+
+  return { notesScanned, results: [...totals.values()] };
+}
+
+const SOUND_REF = /\[sound:([^\]]+)\]/g;
+const IMG_REF = /<img[^>]*src="([^"]+)"/g;
+
+function extractMediaFilenames(fields: Record<string, string>): string[] {
+  const names = new Set<string>();
+  for (const value of Object.values(fields)) {
+    for (const m of value.matchAll(SOUND_REF)) names.add(m[1]);
+    for (const m of value.matchAll(IMG_REF)) names.add(m[1]);
+  }
+  return [...names];
+}
+
+/** Copy a note's referenced media files from the source to a target. Best-effort per file. */
+async function copyNoteMedia(
+  client: AnkiClient,
+  fields: Record<string, string>,
+  targetName: string
+): Promise<void> {
+  for (const filename of extractMediaFilenames(fields)) {
+    try {
+      const data = await ankiConnect.retrieveMediaFile(filename);
+      await client.storeMediaFile(filename, data);
+    } catch (err) {
+      console.warn(
+        `[Distribution] Media copy "${filename}" to "${targetName}" failed (continuing):`,
+        err
+      );
+    }
+  }
 }
 
 async function distributeToTarget(
@@ -40,7 +126,8 @@ async function distributeToTarget(
   sourceNotes: AnkiNote[],
   deckName: string,
   modelName: string,
-  mediaCache?: Map<string, string>
+  mediaCache?: Map<string, string>,
+  options?: DistributeOptions
 ): Promise<DistributeResult> {
   try {
     const client = createAnkiClient(target.url);
@@ -74,6 +161,9 @@ async function distributeToTarget(
       if (existing.length > 0) {
         await client.updateNoteFields({ id: existing[0], fields });
       } else {
+        if (options?.copyMediaOnAdd) {
+          await copyNoteMedia(client, fields, target.name);
+        }
         try {
           await client.addNote({ deckName, modelName, fields, tags: note.tags });
         } catch {

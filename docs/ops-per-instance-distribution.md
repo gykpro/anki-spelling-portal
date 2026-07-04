@@ -68,7 +68,15 @@
 4. 门户 Quick Add 加一张测试卡（`__test_` 前缀），勾选分发到两个孩子实例。
 5. 各 receiver 的 noVNC 里确认卡片出现在正确 deck（不在 "Default"）。
 6. source 上删除该测试卡，确认 receivers 上的副本**仍在**（删除不传播），再到各 receiver 手工删掉测试卡。
-7. 跑一次全量再分发（入口开发中；在此之前可用 API：`findNotes` 全量 → 分批 POST `/api/anki/distribute`），修复历史分发失败造成的缺卡。
+7. 跑一次全量再分发，修复历史分发失败造成的缺卡（会把缺卡连同其音频/图片一并从主库复制过去；已有的卡只更新字段、不动学习进度）：
+
+   ```bash
+   curl -X POST http://<portal>/api/anki/redistribute \
+     -H "Content-Type: application/json" -d '{}'
+   # 可选：只对某个目标 → -d '{"targetProfiles": ["Gao Yi"]}'
+   ```
+
+   注意：全库几百张卡时该请求会运行数分钟（同步等待），curl 请把超时设大（`--max-time 1800`）。响应：`{ notesScanned, results: [{ profile, success, notesDistributed }] }`。
 
 ## 5. 回滚
 
@@ -76,6 +84,8 @@
 - Anki 数据层无破坏性变更：新架构只做 addNote/updateNoteFields/createDeck/createModel，全部可人工撤销。
 
 ## 6. 已知注意事项
+
+- **Telegram token 冲突**：同一个 bot token 只允许一个 long-polling 消费者。本地 dev server 若配置了生产 token，会和 VPS 上的生产 bot 抢 `getUpdates`（表现为两边都收不稳消息），且 dev server 关闭时会向用户广播下线通知。本地开发若不需要测 bot，请在本地 `data/secrets.json` 里留空 `TELEGRAM_BOT_TOKEN`，或申请一个单独的测试 bot token。
 
 - AnkiConnect 容器偶发 HTTP 503（Anki 忙时），门户侧每个目标错误隔离、下次分发自愈；监控只需关注持续性失败。
 - 分发结果按目标逐个上报（`{ profile: <目标名>, success, notesDistributed, error? }`），Telegram 管道会把摘要发回聊天。
