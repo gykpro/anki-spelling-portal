@@ -137,7 +137,9 @@ async function main() {
   delete env.CLAUDECODE;
 
   const extraArgs = process.argv.slice(2);
-  const child = spawn("npx", ["next", "dev", "--port", "3001", ...extraArgs], {
+  // PORT env var overrides the default (3001 is what Playwright's webServer expects)
+  const port = process.env.PORT || "3001";
+  const child = spawn("npx", ["next", "dev", "--port", port, ...extraArgs], {
     stdio: "inherit",
     shell: true,
     env,
