@@ -30,12 +30,15 @@ Before running tests, configure all API keys via the **Settings page** (`/settin
 | AI Backend (option A) | `ANTHROPIC_API_KEY` | Sections 4, 5 (enrichment, extraction) | [console.anthropic.com](https://console.anthropic.com) — pay-per-use |
 | AI Backend (option B) | `CLAUDE_CODE_OAUTH_TOKEN` | Sections 4 (text enrichment only) | Run `claude setup-token` on host — free with Max subscription |
 | Azure TTS | `AZURE_TTS_KEY` + `AZURE_TTS_REGION` | Sections 4i, 4j, 4o (audio generation) | Azure Portal > Cognitive Services > Speech |
-| Gemini API | `NANO_BANANA_API_KEY` | Sections 4e, 4p (image generation) | [aistudio.google.com](https://aistudio.google.com) |
+| OpenAI Image API | `OPENAI_API_KEY` | Sections 4e, 4p (image generation) | [platform.openai.com/api-keys](https://platform.openai.com/api-keys) |
 | Telegram Bot | `TELEGRAM_BOT_TOKEN` | Section 9 (Telegram bot) | [@BotFather](https://t.me/BotFather) on Telegram |
 
 **AI Backend notes:** You need either option A (SDK) or option B (CLI), not both. Both support all features including vision extraction. Configure via Settings page > AI Backend section.
 
 **Note:** API keys are stored in `data/secrets.json` (managed by the Settings page). Environment variables are NOT used for API keys — only `ANKI_CONNECT_URL` can be set via env (for Docker).
+In particular, image generation has no environment fallback for
+`OPENAI_API_KEY`; the test host must also allow outbound HTTPS to
+`api.openai.com:443`.
 
 ### Setup Steps
 1. Start Anki desktop app (ensure AnkiConnect plugin is installed)
@@ -340,11 +343,14 @@ Before running tests, configure all API keys via the **Settings page** (`/settin
 - Verify page refreshes, card now shows sentence and "2 missing" (Image + Sentence Audio)
 
 ### 4e. Image generation (requires sentence)
+- Treat this as a separate, private paid smoke rather than part of the mocked
+  automated suite. Use one test card only, and do not attach the API key or
+  generated image to chat, test logs, screenshots, or source control.
 - Expand the saved card again
 - Verify Image field is now available (no longer "Needs sentence")
 - Select only Image
 - Click Generate
-- Wait for image result (up to 60s)
+- Wait for image result (up to 120s per attempt; at most one transient retry)
 - Verify "Image generated" appears in results
 - Save to Anki, verify card shows "Complete"
 
@@ -586,9 +592,9 @@ After all tests:
 - Verify dev server starts immediately
 
 ### 8c. Config status with keys configured
-- Ensure `data/secrets.json` has Azure and Gemini keys (via Settings page)
+- Ensure `data/secrets.json` has Azure and OpenAI keys (via Settings page)
 - Run `npm run dev`
-- Verify green "Configured" shown for Azure TTS and Gemini
+- Verify green "Configured" shown for Azure TTS and OpenAI Image API
 - Verify AnkiConnect URL shown with source (default or settings)
 
 ### 8d. Missing AI backend warning
@@ -751,7 +757,7 @@ These tests verify the skill scripts work correctly via command line.
 ### Pre-requisites
 - Dev server running on `localhost:3000`
 - Anki running with AnkiConnect
-- All API keys configured (Anthropic, Azure TTS, Gemini)
+- All API keys configured (Anthropic, Azure TTS, OpenAI)
 
 ### 10a. Health check
 - Run `node skill/scripts/enrich-text.mjs --words "__test_skill_nonexistent"` (word not in Anki)
@@ -901,7 +907,7 @@ These tests verify the skill scripts work correctly via command line.
 
 ### Pre-requisites
 - Anki running with "Gao Chinese" deck and "school Chinese spelling" note type configured
-- All API keys configured (Anthropic/Claude, Azure TTS, Gemini)
+- All API keys configured (Anthropic/Claude, Azure TTS, OpenAI)
 - Dev server running
 
 ### 12a. Dashboard — Multi-language health
@@ -1080,7 +1086,7 @@ These tests verify the skill scripts work correctly via command line.
 
 - Test words use `__test_` prefix for easy identification and cleanup
 - Anthropic API generation takes 5-15s per card (single) or 10-20s total (batch) — budget time accordingly
-- Image generation via Gemini takes 10-20s
+- Image generation via `gpt-image-2` is an external paid request; allow up to 120s per attempt (at most one transient retry) and keep live smoke output private
 - If a step fails, screenshot the error state and note it before continuing
 - Skip section 1b if Anki cannot be stopped during testing
 - Skip section 5c-5e if no sample worksheet images are available

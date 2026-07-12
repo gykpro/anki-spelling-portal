@@ -19,7 +19,7 @@ A local web portal for managing Anki spelling cards from school worksheets, powe
 ### AI Enrichment
 - Definitions, phonetic symbols, synonyms, and example sentences
 - TTS audio for words and sentences (Azure Neural Voice)
-- AI-generated cartoon illustrations (Gemini)
+- AI-generated cartoon illustrations (OpenAI Image API, `gpt-image-2`)
 - Chinese: pinyin, stroke order GIFs, sentence pinyin
 
 ### Multi-Language
@@ -74,10 +74,19 @@ All API keys are managed via the Settings page (`/settings`). No environment var
 |---------|---------|----------|
 | Anthropic API | Worksheet extraction + text enrichment | Yes |
 | Azure TTS | Word and sentence audio generation | Optional |
-| Gemini API | Cartoon image generation | Optional |
+| OpenAI Image API | Cartoon image generation with `gpt-image-2` | Optional |
 | Telegram Bot Token | Telegram bot integration | Optional |
 
-The only environment variable is `ANKI_CONNECT_URL` (default: `http://localhost:8765`), used in Docker to point to the headless Anki container.
+`OPENAI_API_KEY` is the environment's one shared OpenAI credential, saved by
+Settings in `data/secrets.json`; image generation uses it without an
+environment-variable fallback or an image-specific duplicate. This change does
+not migrate audio generation, which remains on Azure TTS.
+Each image-provider attempt has a 120-second timeout and at most one transient
+retry. Image saves use the filename returned by Anki media finalization. If an
+image cannot be generated or finalized, Save All leaves that image unsaved and
+excludes the failed item from distribution.
+The only environment variable is `ANKI_CONNECT_URL` (default:
+`http://localhost:8765`), used in Docker to point to the headless Anki container.
 
 ## CLI Skill
 
@@ -85,4 +94,4 @@ The `skill/` directory contains a distributable CLI skill for external AI agents
 
 ## Tech Stack
 
-Next.js 15 (App Router) / React 19 / TypeScript / Tailwind CSS v4 / Anthropic SDK / Azure TTS / Gemini API / grammy (Telegram) / AnkiConnect
+Next.js 15 (App Router) / React 19 / TypeScript / Tailwind CSS v4 / Anthropic SDK / Azure TTS / OpenAI Image API (`gpt-image-2`) / grammy (Telegram) / AnkiConnect

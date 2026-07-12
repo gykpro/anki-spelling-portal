@@ -109,7 +109,7 @@ export async function POST(request: NextRequest) {
         Object.assign(r, parsed);
       }
 
-      // Generate image via Gemini API (requires sentence)
+      // Generate image via the OpenAI Image API (requires sentence)
       if (needsImage) {
         const imgSentence = sentence || (r.sentence as string);
         if (!imgSentence) {

@@ -54,11 +54,30 @@ Set **Backend Mode** to "Auto" (default) to use SDK if available, else fall back
 #### Other services
 
 - **Azure TTS Key + Region** — for audio generation ([Azure Portal](https://portal.azure.com) → Cognitive Services → Speech)
-- **Gemini API Key** — for image generation ([aistudio.google.com](https://aistudio.google.com))
+- **OpenAI API Key** — `OPENAI_API_KEY`, for image generation with the OpenAI Image API model `gpt-image-2` ([OpenAI API keys](https://platform.openai.com/api-keys))
 - **Telegram Bot Token** — for Telegram bot (see [telegram-setup.md](telegram-setup.md))
 - **Telegram Allowed Users** — comma-separated user IDs (optional)
 
 Keys are stored in `./data/secrets.json` (bind-mounted from the host) and persist across container restarts and updates.
+`OPENAI_API_KEY` is the environment's single shared OpenAI credential and is
+read only from that file; there is no image-specific duplicate, second secret
+file, or container-environment fallback. Image migration does not change the
+current Azure TTS path. Allow the portal container outbound HTTPS
+access to `api.openai.com:443`, then restart it after configuring or rotating the
+key:
+
+```bash
+docker compose restart portal
+```
+
+Keep a real paid image smoke separate from automated tests: make one private
+request after restart and do not copy the key or generated artifact into chat,
+test logs, images, or source control.
+
+Allow up to 120 seconds for each provider attempt; the portal makes at most one
+additional attempt, and only after a transient failure. A successful Anki media
+write supplies the finalized filename used by Picture. Failed images in Save All
+remain unsaved and are excluded from distribution.
 
 ### 3. Initial AnkiWeb sync (first run)
 

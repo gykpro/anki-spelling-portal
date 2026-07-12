@@ -10,7 +10,7 @@ const CONFIG_KEYS = {
   CLAUDE_CODE_OAUTH_TOKEN: { secret: true, envAllowed: false, description: "Claude Max OAuth token (CLI mode)" },
   AZURE_TTS_KEY: { secret: true, envAllowed: false, description: "Azure TTS subscription key" },
   AZURE_TTS_REGION: { secret: false, envAllowed: false, description: "Azure TTS region", default: "australiaeast" },
-  NANO_BANANA_API_KEY: { secret: true, envAllowed: false, description: "Gemini API key for image generation" },
+  OPENAI_API_KEY: { secret: true, envAllowed: false, description: "Shared OpenAI API key for this environment" },
   ANKI_CONNECT_URL: { secret: false, envAllowed: true, description: "AnkiConnect URL", default: "http://localhost:8765" },
   AI_BACKEND: { secret: false, envAllowed: false, description: "AI backend: auto, sdk, or cli", default: "auto" },
   TELEGRAM_BOT_TOKEN: { secret: true, envAllowed: false, description: "Telegram Bot API token from @BotFather" },
@@ -19,6 +19,10 @@ const CONFIG_KEYS = {
 } as const;
 
 export type ConfigKey = keyof typeof CONFIG_KEYS;
+
+export function isConfigKey(key: string): key is ConfigKey {
+  return Object.prototype.hasOwnProperty.call(CONFIG_KEYS, key);
+}
 
 interface StoredSettings {
   [key: string]: string;
@@ -54,7 +58,10 @@ function writeFile(data: StoredSettings): void {
   if (!existsSync(DATA_DIR)) {
     mkdirSync(DATA_DIR, { recursive: true });
   }
-  writeFileSync(SECRETS_FILE, JSON.stringify(data, null, 2), "utf-8");
+  writeFileSync(SECRETS_FILE, JSON.stringify(data, null, 2), {
+    encoding: "utf-8",
+    mode: 0o600,
+  });
   try {
     chmodSync(SECRETS_FILE, 0o600);
   } catch {
@@ -122,11 +129,22 @@ export function getAllConfigStatus(): Record<ConfigKey, ConfigStatus> {
 /** Save settings updates. Empty string = delete key from file. */
 export function saveSettings(updates: Partial<Record<ConfigKey, string>>): void {
   const stored = readFile();
-  const newData = { ...stored };
+  const newData: StoredSettings = {};
+
+  for (const [key, value] of Object.entries(stored)) {
+    if (isConfigKey(key) && typeof value === "string") {
+      newData[key] = value;
+    }
+  }
 
   for (const [key, value] of Object.entries(updates)) {
+    if (!isConfigKey(key)) {
+      throw new Error(`Unknown setting: ${key}`);
+    }
     if (value === "" || value === undefined) {
       delete newData[key];
+    } else if (typeof value !== "string") {
+      throw new Error(`Setting ${key} must be a string`);
     } else {
       newData[key] = value;
     }

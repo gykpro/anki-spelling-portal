@@ -32,6 +32,43 @@ function stripHtml(html: string): string {
   return html.replace(/<[^>]*>/g, "");
 }
 
+type ValidPngImage = {
+  base64: string;
+  mimeType: "image/png";
+};
+
+function validatePngImage(value: unknown): ValidPngImage {
+  if (!value || typeof value !== "object") {
+    throw new Error("Image generation returned no image");
+  }
+
+  const candidate = value as { base64?: unknown; mimeType?: unknown };
+  if (typeof candidate.base64 !== "string" || !candidate.base64.trim()) {
+    throw new Error("Image generation returned empty image data");
+  }
+  if (candidate.mimeType !== "image/png") {
+    throw new Error("Image generation returned a non-PNG image");
+  }
+
+  const base64 = candidate.base64.replace(/\s/g, "");
+  let decoded: string;
+  try {
+    decoded = atob(base64);
+  } catch {
+    throw new Error("Image generation returned invalid base64 data");
+  }
+
+  const pngSignature = [137, 80, 78, 71, 13, 10, 26, 10];
+  if (
+    decoded.length < pngSignature.length ||
+    pngSignature.some((byte, index) => decoded.charCodeAt(index) !== byte)
+  ) {
+    throw new Error("Image generation returned invalid PNG data");
+  }
+
+  return { base64, mimeType: "image/png" };
+}
+
 function AudioPreview({ base64, label }: { base64: string; label: string }) {
   return (
     <div className="flex items-center gap-2">
@@ -135,6 +172,24 @@ type NoteEnrichState = {
   error: string | null;
   expanded: boolean;
 };
+
+type ImageBatchOutcome = {
+  noteId: number;
+  word: string;
+  status: "succeeded" | "failed" | "not_attempted";
+  error: string | null;
+};
+
+function hasSavableResult(results: Record<string, unknown> | null): boolean {
+  if (!results) return false;
+
+  return Object.entries(results).some(([key, value]) => {
+    if (key === "noteId" || key === "word" || key.endsWith("_error")) {
+      return false;
+    }
+    return value !== null && value !== undefined && value !== "";
+  });
+}
 
 function EnrichCard({
   note,
@@ -377,7 +432,16 @@ function EnrichCard({
 
           {/* Error */}
           {state.error && (
-            <div className="flex items-start gap-2 rounded-md bg-destructive/5 p-2 text-xs text-destructive">
+            <div
+              data-testid={
+                state.results &&
+                ("image" in state.results || "image_error" in state.results)
+                  ? "image-save-error"
+                  : undefined
+              }
+              data-note-id={note.noteId}
+              className="flex items-start gap-2 rounded-md bg-destructive/5 p-2 text-xs text-destructive"
+            >
               <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
               {state.error}
             </div>
@@ -397,9 +461,11 @@ function EnrichCard({
               )}
               {state.enriching ? "Generating..." : "Generate"}
             </button>
-            {state.results && !state.saved && (
+            {hasSavableResult(state.results) && !state.saved && (
               <button
                 onClick={onSave}
+                data-testid={state.results?.image ? "image-save" : undefined}
+                data-note-id={note.noteId}
                 className="inline-flex items-center gap-1.5 rounded-md bg-success px-4 py-1.5 text-xs font-medium text-success-foreground hover:opacity-90"
               >
                 <Save className="h-3.5 w-3.5" /> Save to Anki
@@ -422,8 +488,11 @@ function EnrichContent() {
   const [batchEnriching, setBatchEnriching] = useState(false);
   const [savingAll, setSavingAll] = useState(false);
   const [batchProgress, setBatchProgress] = useState("");
+  const [imageBatchOutcomes, setImageBatchOutcomes] = useState<ImageBatchOutcome[]>([]);
+  const [imageBatchSummary, setImageBatchSummary] = useState<string | null>(null);
   const [saveAllProgress, setSaveAllProgress] = useState<{ current: number; total: number } | null>(null);
   const [saveAllDone, setSaveAllDone] = useState(false);
+  const [saveAllResult, setSaveAllResult] = useState<{ saved: number; failed: number } | null>(null);
   const [autoEnrichPhase, setAutoEnrichPhase] = useState<string | null>(null);
   const autoEnrichTriggered = useRef(false);
   const [distTargets, setDistTargets] = useState<string[]>([]);
@@ -565,13 +634,23 @@ function EnrichContent() {
     }
   };
 
-  const save = async (noteId: number, skipRefresh = false) => {
+  const save = async (noteId: number, skipRefresh = false): Promise<boolean> => {
     const state = noteStates[noteId];
     const note = notes.find((n) => n.noteId === noteId);
-    if (!state?.results || !note) return;
+    if (!state?.results || !note) return false;
+
+    setNoteStates((prev) => ({
+      ...prev,
+      [noteId]: { ...prev[noteId], error: null, saved: false },
+    }));
 
     const r = state.results;
     const fields: Record<string, string> = {};
+    let finalizedImageMedia: { filename: string; data: string } | null = null;
+    let imageFailure =
+      typeof r.image_error === "string" && r.image_error.trim()
+        ? r.image_error
+        : null;
 
     if (r.sentence) {
       const word = getFieldValue(note, "Word");
@@ -598,22 +677,42 @@ function EnrichContent() {
       fields["Main Sentence Pinyin"] = r.sentencePinyin as string;
     }
 
-    // Handle image: store in Anki media, then set Picture field
-    if (r.image && typeof r.image === "object") {
-      const img = r.image as { base64: string; mimeType: string };
-      const ext = img.mimeType.includes("png") ? "png" : "jpg";
-      const word = getFieldValue(note, "Word").replace(/\s+/g, "_");
-      const filename = `spelling_${word}_${noteId}.${ext}`;
-
+    // An image save is atomic from the card's point of view: validate the
+    // generated PNG and finalize it in Anki before adding Picture to the PUT.
+    const hasGeneratedImage = "image" in r;
+    if (hasGeneratedImage) {
       try {
-        await fetch("/api/anki/media", {
+        const img = validatePngImage(r.image);
+        const word = getFieldValue(note, "Word").replace(/\s+/g, "_");
+        const filename = `spelling_${word}_${noteId}.png`;
+        const mediaResponse = await fetch("/api/anki/media", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ filename, data: img.base64 }),
         });
-        fields["Picture"] = `<img src="${filename}">`;
-      } catch {
-        // Image save failed, skip
+
+        const mediaBody = (await mediaResponse.json().catch(() => null)) as {
+          filename?: unknown;
+          error?: unknown;
+        } | null;
+        if (!mediaResponse.ok) {
+          const message =
+            typeof mediaBody?.error === "string" && mediaBody.error.trim()
+              ? mediaBody.error
+              : `Image media finalization failed (${mediaResponse.status})`;
+          throw new Error(message);
+        }
+        if (typeof mediaBody?.filename !== "string" || !mediaBody.filename.trim()) {
+          throw new Error("Image media finalization returned no filename");
+        }
+
+        fields["Picture"] = `<img src="${mediaBody.filename}">`;
+        finalizedImageMedia = { filename: mediaBody.filename, data: img.base64 };
+      } catch (err) {
+        imageFailure =
+          err instanceof Error
+            ? err.message
+            : "Image media finalization failed";
       }
     }
 
@@ -653,18 +752,24 @@ function EnrichContent() {
       }
     }
 
-    if (Object.keys(fields).length === 0) return;
+    if (Object.keys(fields).length === 0) {
+      if (imageFailure) {
+        setNoteStates((prev) => ({
+          ...prev,
+          [noteId]: {
+            ...prev[noteId],
+            saved: false,
+            error: imageFailure,
+          },
+        }));
+      }
+      return false;
+    }
 
     // Collect media files for distribution
     const mediaFiles: { filename: string; data: string }[] = [];
 
-    if (r.image && typeof r.image === "object") {
-      const img = r.image as { base64: string; mimeType: string };
-      const ext = img.mimeType.includes("png") ? "png" : "jpg";
-      const cleanWord = getFieldValue(note, "Word").replace(/\s+/g, "_");
-      const imgFilename = `spelling_${cleanWord}_${noteId}.${ext}`;
-      mediaFiles.push({ filename: imgFilename, data: img.base64 });
-    }
+    if (finalizedImageMedia) mediaFiles.push(finalizedImageMedia);
     if (r.audio && typeof r.audio === "object") {
       const audio = r.audio as { base64: string };
       const cleanWord = getFieldValue(note, "Word").replace(/\s+/g, "_");
@@ -689,7 +794,11 @@ function EnrichContent() {
 
       setNoteStates((prev) => ({
         ...prev,
-        [noteId]: { ...prev[noteId], saved: true },
+        [noteId]: {
+          ...prev[noteId],
+          saved: !imageFailure,
+          error: imageFailure,
+        },
       }));
 
       // Generate extra info audio if extra_info was just saved
@@ -710,12 +819,13 @@ function EnrichContent() {
       }
 
       // Distribute to target profiles (skip when called from batch save — batch distributes at the end)
-      if (!skipRefresh && distTargets.length > 0) {
+      if (!imageFailure && !skipRefresh && distTargets.length > 0) {
         distribute([noteId], distTargets, mediaFiles.length > 0 ? mediaFiles : undefined);
       }
 
       // Refresh the note data (skip when called from batch save)
-      if (!skipRefresh) fetchNotes();
+      if (!imageFailure && !skipRefresh) fetchNotes();
+      return !imageFailure;
     } catch (err) {
       setNoteStates((prev) => ({
         ...prev,
@@ -724,6 +834,7 @@ function EnrichContent() {
           error: err instanceof Error ? err.message : "Save failed",
         },
       }));
+      return false;
     }
   };
 
@@ -842,39 +953,56 @@ function EnrichContent() {
 
   const saveAll = async () => {
     const unsavedNoteIds = notes
-      .filter((n) => noteStates[n.noteId]?.results && !noteStates[n.noteId]?.saved)
+      .filter(
+        (n) =>
+          hasSavableResult(noteStates[n.noteId]?.results ?? null) &&
+          !noteStates[n.noteId]?.saved
+      )
       .map((n) => n.noteId);
 
     if (unsavedNoteIds.length === 0) return;
 
     setSavingAll(true);
     setSaveAllDone(false);
+    setSaveAllResult(null);
     setSaveAllProgress({ current: 0, total: unsavedNoteIds.length });
     setBatchProgress(`Saving ${unsavedNoteIds.length} cards...`);
 
     let savedCount = 0;
+    let failedCount = 0;
+    let completedCount = 0;
+    const savedNoteIds: number[] = [];
     for (const noteId of unsavedNoteIds) {
-      await save(noteId, true);
-      savedCount++;
-      setSaveAllProgress({ current: savedCount, total: unsavedNoteIds.length });
-      setBatchProgress(`Saved ${savedCount}/${unsavedNoteIds.length}...`);
+      const succeeded = await save(noteId, true);
+      if (succeeded) {
+        savedCount += 1;
+        savedNoteIds.push(noteId);
+      } else {
+        failedCount += 1;
+      }
+      completedCount += 1;
+      setSaveAllProgress({ current: completedCount, total: unsavedNoteIds.length });
+      setBatchProgress(`Saving ${completedCount}/${unsavedNoteIds.length}...`);
     }
 
     // Distribute all saved notes in one batch (single profile switch round-trip)
-    if (distTargets.length > 0) {
+    if (distTargets.length > 0 && savedNoteIds.length > 0) {
       setBatchProgress("Distributing to other profiles...");
-      await distribute(unsavedNoteIds, distTargets);
+      await distribute(savedNoteIds, distTargets);
     }
 
-    setBatchProgress(`All ${savedCount} cards saved`);
+    const summary = `${savedCount} saved, ${failedCount} failed`;
+    setBatchProgress(summary);
+    setSaveAllResult({ saved: savedCount, failed: failedCount });
     setSavingAll(false);
     setSaveAllDone(true);
-    fetchNotes();
+    if (failedCount === 0) fetchNotes();
 
-    // Auto-dismiss the success banner after 3 seconds
+    // Auto-dismiss the result banner after 3 seconds.
     setTimeout(() => {
       setSaveAllProgress(null);
       setSaveAllDone(false);
+      setSaveAllResult(null);
       setBatchProgress("");
     }, 3000);
   };
@@ -1009,6 +1137,18 @@ function EnrichContent() {
 
     setBatchEnriching(true);
     setBatchProgress(`Images 0/${cardsNeedingImages.length}...`);
+    setImageBatchSummary(null);
+    setImageBatchOutcomes(
+      cardsNeedingImages.map((card) => ({
+        noteId: card.noteId,
+        word: card.word,
+        status: "not_attempted",
+        error: null,
+      }))
+    );
+
+    let succeeded = 0;
+    let failed = 0;
 
     // Mark all cards as enriching
     setNoteStates((prev) => {
@@ -1040,31 +1180,68 @@ function EnrichContent() {
           throw new Error(err.error || "Image generation failed");
         }
 
-        const results = await res.json();
-        setNoteStates((prev) => ({
-          ...prev,
-          [card.noteId]: {
-            ...prev[card.noteId],
-            enriching: false,
-            results: prev[card.noteId].results
-              ? { ...prev[card.noteId].results, ...results }
-              : results,
-            expanded: true,
-          },
-        }));
+        const results = (await res.json()) as Record<string, unknown>;
+        if (typeof results.image_error === "string" && results.image_error.trim()) {
+          throw new Error(results.image_error);
+        }
+        const image = validatePngImage(results.image);
+
+        succeeded += 1;
+        setImageBatchOutcomes((prev) =>
+          prev.map((outcome) =>
+            outcome.noteId === card.noteId
+              ? { ...outcome, status: "succeeded", error: null }
+              : outcome
+          )
+        );
+        setNoteStates((prev) => {
+          const mergedResults: Record<string, unknown> = {
+            ...(prev[card.noteId].results ?? {}),
+            ...results,
+            image,
+          };
+          delete mergedResults.image_error;
+          return {
+            ...prev,
+            [card.noteId]: {
+              ...prev[card.noteId],
+              enriching: false,
+              results: mergedResults,
+              expanded: true,
+            },
+          };
+        });
       } catch (err) {
-        setNoteStates((prev) => ({
-          ...prev,
-          [card.noteId]: {
-            ...prev[card.noteId],
-            enriching: false,
-            error: err instanceof Error ? err.message : "Image failed",
-          },
-        }));
+        const error = err instanceof Error ? err.message : "Image failed";
+        failed += 1;
+        setImageBatchOutcomes((prev) =>
+          prev.map((outcome) =>
+            outcome.noteId === card.noteId
+              ? { ...outcome, status: "failed", error }
+              : outcome
+          )
+        );
+        setNoteStates((prev) => {
+          const failedResults = { ...(prev[card.noteId].results ?? {}) };
+          delete failedResults.image;
+          failedResults.image_error = error;
+          return {
+            ...prev,
+            [card.noteId]: {
+              ...prev[card.noteId],
+              enriching: false,
+              results: failedResults,
+              error,
+            },
+          };
+        });
       }
     }
 
-    setBatchProgress(`Images done for ${cardsNeedingImages.length} cards`);
+    const notAttempted = cardsNeedingImages.length - succeeded - failed;
+    const summary = `${succeeded} succeeded, ${failed} failed, ${notAttempted} not attempted`;
+    setBatchProgress(summary);
+    setImageBatchSummary(summary);
     setBatchEnriching(false);
   };
 
@@ -1481,7 +1658,9 @@ function EnrichContent() {
 
   // Count unsaved results
   const unsavedCount = notes.filter(
-    (n) => noteStates[n.noteId]?.results && !noteStates[n.noteId]?.saved
+    (n) =>
+      hasSavableResult(noteStates[n.noteId]?.results ?? null) &&
+      !noteStates[n.noteId]?.saved
   ).length;
 
   if (loading) {
@@ -1570,6 +1749,7 @@ function EnrichContent() {
 
         <button
           onClick={generateAllImages}
+          data-testid="image-batch-generate"
           disabled={batchEnriching || savingAll || cardsWithMissingImages === 0}
           className="inline-flex items-center gap-1.5 rounded-md bg-primary/80 px-4 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-40"
         >
@@ -1620,6 +1800,7 @@ function EnrichContent() {
         {unsavedCount > 0 && (
           <button
             onClick={saveAll}
+            data-testid="save-all"
             disabled={batchEnriching || savingAll}
             className="inline-flex items-center gap-1.5 rounded-md bg-success px-4 py-1.5 text-xs font-medium text-success-foreground hover:opacity-90 disabled:opacity-40"
           >
@@ -1637,20 +1818,55 @@ function EnrichContent() {
         )}
       </div>
 
+      {imageBatchOutcomes.length > 0 && (
+        <div className="rounded-lg border border-border bg-muted/20 p-3 text-xs">
+          {imageBatchSummary && (
+            <p
+              data-testid="image-batch-summary"
+              className="mb-2 font-medium"
+            >
+              {imageBatchSummary}
+            </p>
+          )}
+          <div className="space-y-1 text-muted-foreground">
+            {imageBatchOutcomes.map((outcome) => (
+              <p
+                key={outcome.noteId}
+                data-testid={`image-batch-outcome-${outcome.noteId}`}
+              >
+                <span className="font-medium text-foreground">{outcome.word}</span>
+                {`: ${outcome.status === "not_attempted" ? "not attempted" : outcome.status}`}
+                {outcome.error ? ` — ${outcome.error}` : ""}
+              </p>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Save All progress banner */}
       {(savingAll || saveAllDone) && saveAllProgress && (
         <div className={cn(
           "rounded-lg border p-4 text-sm",
           saveAllDone
-            ? "border-success/50 bg-success/5 text-success"
+            ? saveAllResult?.failed
+              ? "border-warning/50 bg-warning/5 text-warning"
+              : "border-success/50 bg-success/5 text-success"
             : "border-primary/50 bg-primary/5 text-primary"
         )}>
           <div className="flex items-center gap-2">
             {savingAll && <LoadingSpinner size="sm" />}
-            {saveAllDone && <Check className="h-4 w-4" />}
-            <span className="font-medium">
+            {saveAllDone && saveAllResult?.failed === 0 && (
+              <Check className="h-4 w-4" />
+            )}
+            {saveAllDone && !!saveAllResult?.failed && (
+              <AlertCircle className="h-4 w-4" />
+            )}
+            <span
+              data-testid={saveAllDone ? "save-all-summary" : undefined}
+              className="font-medium"
+            >
               {saveAllDone
-                ? `All ${saveAllProgress.total} cards saved successfully`
+                ? `${saveAllResult?.saved ?? 0} saved, ${saveAllResult?.failed ?? 0} failed`
                 : `Saving ${saveAllProgress.current}/${saveAllProgress.total} cards...`}
             </span>
           </div>

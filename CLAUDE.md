@@ -71,7 +71,9 @@ Follow this order for every feature request or change:
 
 - Prioritise Claude Code CLI for AI calls, since it's subscription based
 - Anki is source of truth — no database
-- Image generation via Gemini API directly (not through Claude)
+- Image generation via the OpenAI Image API model `gpt-image-2` directly (not through Claude); its `OPENAI_API_KEY` is file-managed only
+- Image-provider attempts time out after 120 seconds and get at most one transient retry; update Picture only with Anki's returned finalized filename
+- A failed image save remains unsaved and must not be included in distribution
 - Audio generation via Azure TTS
 - Deployable via Docker (see `docs/nas-setup.md`)
 

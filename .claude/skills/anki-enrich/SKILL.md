@@ -25,6 +25,12 @@ Edit `config.json` in this skill directory to point to the running portal:
 
 For NAS/Docker deployments, use the appropriate URL (e.g., `http://nas.local:3000`).
 
+Image enrichment requires the portal to have a file-managed `OPENAI_API_KEY`
+configured in `data/secrets.json` through Settings. The portal does not read this
+key from the process environment and generates illustrations with the OpenAI
+Image API model `gpt-image-2`. Portal, Telegram, and skill image calls share this
+one key; audio continues to use Azure TTS.
+
 ## Language Support
 
 Scripts support English and Chinese with automatic language detection:
@@ -124,7 +130,11 @@ Supported image formats: JPEG, PNG, GIF, WebP. **PDFs are not supported** by the
 ### Media fields
 - **audio** — Word pronunciation (Azure TTS, MP3)
 - **sentence_audio** — Full sentence pronunciation (Azure TTS, MP3)
-- **image** — Cartoon illustration (Gemini API)
+- **image** — Cartoon illustration (OpenAI Image API, `gpt-image-2`). Each
+  provider attempt has a 120-second timeout and only one retry is allowed, for a
+  transient failure. The Picture field uses the exact finalized filename
+  returned by Anki; an invalid image or media-finalization failure leaves it
+  unchanged.
 - **strokeOrder** — Animated stroke order GIFs per character (Chinese only, from MDBG)
 
 ## Limitations
@@ -134,25 +144,33 @@ Supported image formats: JPEG, PNG, GIF, WebP. **PDFs are not supported** by the
 
 ## Output Format
 
-All scripts output JSON to stdout with this structure:
+All scripts output JSON to stdout. `enrich-image.mjs` and `enrich-full.mjs`
+include every requested word or note ID in `results`, including unresolved
+cards or cards without a sentence; work that was never sent to the image
+provider has `status: "not_attempted"` and a reason.
 
 ```json
 {
   "results": [
-    { "noteId": 123, "word": "adventure", "enriched": true },
-    { "noteId": 456, "word": "magnificent", "error": "reason" }
+    { "noteId": 123, "word": "adventure", "status": "succeeded", "enriched": true },
+    { "noteId": 456, "word": "magnificent", "status": "failed", "error": "reason" },
+    { "word": "unresolved", "status": "not_attempted", "reason": "not found" }
   ],
   "succeeded": 1,
-  "failed": 1
+  "failed": 1,
+  "notAttempted": 1
 }
 ```
 
 Progress messages go to stderr. Parse stdout for the JSON summary.
 
 ## Exit Codes
-- **0** — All succeeded
-- **1** — Partial success (some cards failed)
-- **2** — Total failure (no cards enriched, or fatal error)
+
+For `enrich-image.mjs` and `enrich-full.mjs`:
+
+- **0** — Every requested item succeeded
+- **1** — At least one item succeeded and at least one failed or was not attempted
+- **2** — Zero items succeeded, or a fatal error prevented a usable result
 
 ## Error Handling
 

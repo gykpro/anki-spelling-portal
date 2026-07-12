@@ -104,7 +104,7 @@ async function main() {
   }
 
   // Run the full enrichment pipeline via child process
-  const { execFileSync } = await import("node:child_process");
+  const { spawnSync } = await import("node:child_process");
   const { dirname, resolve } = await import("node:path");
   const { fileURLToPath } = await import("node:url");
 
@@ -116,16 +116,21 @@ async function main() {
     args.push("--lang", lang.id);
   }
 
-  try {
-    const output = execFileSync("node", args, {
-      encoding: "utf-8",
-      stdio: ["inherit", "pipe", "inherit"],
-      timeout: 600000, // 10 minutes
-    });
-    process.stdout.write(output);
-  } catch (err) {
-    process.stderr.write(`Enrichment subprocess failed: ${err.message}\n`);
-    process.exit(1);
+  const child = spawnSync(process.execPath, args, {
+    encoding: "utf-8",
+    stdio: ["inherit", "pipe", "inherit"],
+  });
+  if (child.stdout) process.stdout.write(child.stdout);
+  if (child.error) {
+    process.stderr.write(`Enrichment subprocess failed: ${child.error.message}\n`);
+    process.exit(2);
+  }
+  if (typeof child.status === "number" && child.status !== 0) {
+    process.exit(child.status);
+  }
+  if (child.signal) {
+    process.stderr.write(`Enrichment subprocess stopped by ${child.signal}\n`);
+    process.exit(2);
   }
 }
 

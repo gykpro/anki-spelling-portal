@@ -26,6 +26,10 @@ import {
   getLanguageById,
   getLanguageByNoteType,
 } from "@/lib/languages";
+import {
+  assertValidPngBase64,
+  requestOpenAIImage,
+} from "@/lib/openai-image";
 
 // ─── Extraction prompt (shared with extract route) ───
 
@@ -179,15 +183,14 @@ export async function generateTTS(
 
 // ─── Image generation ───
 
-const IMAGE_GEN_ATTEMPTS = 2; // 1 retry on transient Gemini failures
-const IMAGE_GEN_RETRY_DELAY_MS = 1000;
-
 export async function generateImage(
   word: string,
   sentence: string
 ): Promise<{ base64: string; mimeType: string }> {
-  const apiKey = getConfig("NANO_BANANA_API_KEY");
-  if (!apiKey) throw new Error("NANO_BANANA_API_KEY not configured");
+  const apiKey = getConfig("OPENAI_API_KEY");
+  if (!apiKey) {
+    throw new Error("OpenAI API Key is not configured in Settings");
+  }
 
   const prompt = `Create a simple, clear cartoon illustration for a children's vocabulary flashcard.
 
@@ -196,68 +199,14 @@ The key vocabulary word is: "${word}"
 
 Requirements:
 - Create a scene, but do not literally put the sentence nor the word in the result picture
+- Do not include any text, letters, labels, captions, signs, logos, or watermarks
 - Show exactly what the sentence describes — do not add extra characters, objects, or actions not mentioned
 - Real-world objects must look physically correct (right number of limbs, fingers, wheels, handles, etc.) — no anatomical or structural errors
 - Use bright, friendly colors
 - Keep the composition simple and uncluttered — one clear focal point
 - The illustration should help a 10-year-old understand and remember the word "${word}"`;
 
-  let lastError: unknown;
-  for (let attempt = 1; attempt <= IMAGE_GEN_ATTEMPTS; attempt++) {
-    try {
-      return await requestGeminiImage(prompt, apiKey);
-    } catch (err) {
-      lastError = err;
-      if (attempt < IMAGE_GEN_ATTEMPTS) {
-        console.warn(`[ImageGen] Attempt ${attempt} failed for "${word}", retrying:`, err);
-        await new Promise((r) => setTimeout(r, IMAGE_GEN_RETRY_DELAY_MS));
-      }
-    }
-  }
-  throw lastError;
-}
-
-async function requestGeminiImage(
-  prompt: string,
-  apiKey: string
-): Promise<{ base64: string; mimeType: string }> {
-  const res = await fetch(
-    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent",
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-goog-api-key": apiKey,
-      },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [{ text: prompt }],
-          },
-        ],
-      }),
-    }
-  );
-
-  if (!res.ok) {
-    const errBody = await res.text();
-    throw new Error(`Gemini API error ${res.status}: ${errBody}`);
-  }
-
-  const data = await res.json();
-
-  for (const candidate of data.candidates || []) {
-    for (const part of candidate.content?.parts || []) {
-      if (part.inlineData) {
-        return {
-          base64: part.inlineData.data,
-          mimeType: part.inlineData.mimeType || "image/png",
-        };
-      }
-    }
-  }
-
-  throw new Error("No image returned from Gemini");
+  return requestOpenAIImage(prompt, apiKey);
 }
 
 // ─── Constants ───
@@ -662,15 +611,27 @@ export async function generateAndSaveImage(
   sentence: string
 ): Promise<MediaFile[]> {
   const imgResult = await generateImage(word, stripHtml(sentence));
-  const ext = imgResult.mimeType.includes("png") ? "png" : "jpg";
+  assertValidPngBase64(imgResult.base64);
   const safeWord = word.replace(/[^a-zA-Z0-9\u4e00-\u9fff]/g, "_");
-  const filename = `spelling_img_${safeWord}_${noteId}.${ext}`;
-  await ankiConnect.storeMediaFile(filename, imgResult.base64);
+  const filename = `spelling_img_${safeWord}_${noteId}.png`;
+  const finalizedFilename = await ankiConnect.storeMediaFile(
+    filename,
+    imgResult.base64
+  );
+  if (!finalizedFilename?.trim()) {
+    throw new Error(`Image media finalization failed for "${word}"`);
+  }
+  if (
+    finalizedFilename !== finalizedFilename.trim() ||
+    /[<>&"'\u0000-\u001f\u007f]/.test(finalizedFilename)
+  ) {
+    throw new Error(`Image media finalization returned an unsafe filename for "${word}"`);
+  }
   await ankiConnect.updateNoteFields({
     id: noteId,
-    fields: { Picture: `<img src="${filename}">` },
+    fields: { Picture: `<img src="${finalizedFilename}">` },
   });
-  return [{ filename, data: imgResult.base64 }];
+  return [{ filename: finalizedFilename, data: imgResult.base64 }];
 }
 
 /** Generate and save stroke order GIFs for Chinese characters in a word */

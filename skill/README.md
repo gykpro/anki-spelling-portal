@@ -31,3 +31,17 @@ node scripts/extract-worksheet.mjs --images /path/to/page.jpg --enrich
 ```
 
 See `SKILL.md` for full documentation and intent mapping.
+
+## Image/full result contract
+
+`enrich-image.mjs` and `enrich-full.mjs` write one JSON result for every
+requested word or note ID. Each result has `status: "succeeded"`, `"failed"`,
+or `"not_attempted"`; unresolved requests and cards without the sentence
+required for image generation are `not_attempted`. The summary includes
+`succeeded`, `failed`, and `notAttempted` counts.
+
+Their exit codes are:
+
+- `0` — every requested item succeeded
+- `1` — at least one item succeeded and at least one failed or was not attempted
+- `2` — zero items succeeded, or a fatal error stopped the run

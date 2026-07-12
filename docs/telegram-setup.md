@@ -78,7 +78,7 @@ The bot will:
 2. Create notes in Anki
 3. Enrich with definition, phonetics, synonyms, example sentences
 4. Generate word audio and sentence audio (Azure TTS)
-5. Generate an illustration (Gemini)
+5. Generate an illustration (OpenAI Image API, `gpt-image-2`)
 6. Report results
 
 ### Sending worksheet photos
@@ -110,5 +110,7 @@ If you send something the bot doesn't understand (e.g., a long sentence or quest
 
 ### Enrichment errors
 - Check that AI backend is configured (Anthropic API key or Claude OAuth token)
-- Check that Azure TTS key and Gemini API key are configured
+- Check that the Azure TTS key and file-managed `OPENAI_API_KEY` are configured
+- Ensure the portal can reach `api.openai.com:443`; restart the portal after changing the image API key
+- Image calls allow 120 seconds per attempt and retry at most once, only for a transient failure
 - Individual enrichment failures are reported but don't block other steps

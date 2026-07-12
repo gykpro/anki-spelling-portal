@@ -32,10 +32,15 @@ async function main() {
   await checkHealth();
 
   let notes;
+  let requestedItems;
   let lang;
 
   if (values.words) {
     const words = values.words.split(",").map((w) => w.trim()).filter(Boolean);
+    if (words.length === 0) {
+      process.stderr.write("Error: provide at least one word\n");
+      process.exit(2);
+    }
     lang = resolveLanguage(values.lang, words[0]);
 
     // Check duplicates and create new notes for unknown words
@@ -52,22 +57,57 @@ async function main() {
     }
 
     // Resolve all words (existing + newly created) to note objects
-    notes = await resolveWordsToNotes(words, lang);
-    if (notes.length === 0) {
-      process.stderr.write("Error: no notes could be resolved\n");
-      process.exit(2);
-    }
+    const resolvedNotes = await resolveWordsToNotes(words, lang);
+    let resolvedIndex = 0;
+    requestedItems = words.map((word, requestIndex) => {
+      const candidate = resolvedNotes[resolvedIndex];
+      if (candidate?.word?.toLowerCase() === word.toLowerCase()) {
+        resolvedIndex++;
+        return { ...candidate, requestIndex };
+      }
+      return {
+        word,
+        requestIndex,
+        unresolvedReason: "word could not be resolved after note creation",
+      };
+    });
+    notes = requestedItems.filter((item) => !item.unresolvedReason);
   } else if (values.noteIds) {
     lang = resolveLanguage(values.lang);
-    const ids = values.noteIds.split(",").map((id) => parseInt(id.trim(), 10)).filter((id) => !isNaN(id));
+    const idTokens = values.noteIds.split(",").map((id) => id.trim()).filter(Boolean);
+    const ids = idTokens.map((id) => Number(id));
+    if (
+      ids.length === 0 ||
+      ids.some((id) => !Number.isSafeInteger(id) || id <= 0)
+    ) {
+      process.stderr.write("Error: --noteIds must contain positive integer note IDs\n");
+      process.exit(2);
+    }
     const data = await get(
       `/api/anki/notes?q=${encodeURIComponent(`nid:${ids.join(" OR nid:")}`)}&limit=${ids.length}`
     );
-    notes = (data.notes || []).map((n) => ({
-      noteId: n.noteId,
-      word: n.fields?.Word?.value || "",
-      sentence: n.fields?.["Main Sentence"]?.value?.replace(/<[^>]*>/g, "") || "",
-    }));
+    const notesById = new Map(
+      (data.notes || []).map((n) => [
+        n.noteId,
+        {
+          noteId: n.noteId,
+          word: n.fields?.Word?.value || "",
+          sentence: n.fields?.["Main Sentence"]?.value?.replace(/<[^>]*>/g, "") || "",
+        },
+      ])
+    );
+    requestedItems = ids.map((noteId, requestIndex) => {
+      const resolved = notesById.get(noteId);
+      return resolved
+        ? { ...resolved, requestIndex }
+        : {
+            noteId,
+            word: "",
+            requestIndex,
+            unresolvedReason: "note ID not found in Anki deck",
+          };
+    });
+    notes = requestedItems.filter((item) => !item.unresolvedReason);
   } else {
     process.stderr.write("Error: provide --noteIds or --words\n");
     process.exit(2);
@@ -78,6 +118,32 @@ async function main() {
   const results = [];
   let totalSucceeded = 0;
   let totalFailed = 0;
+  let totalNotAttempted = 0;
+
+  if (notes.length === 0) {
+    for (const item of requestedItems) {
+      results.push({
+        ...(item.noteId !== undefined ? { noteId: item.noteId } : {}),
+        ...(item.word ? { word: item.word } : {}),
+        status: "not_attempted",
+        reason: item.unresolvedReason,
+      });
+      totalNotAttempted++;
+    }
+    process.stdout.write(
+      JSON.stringify(
+        {
+          results,
+          succeeded: 0,
+          failed: 0,
+          notAttempted: totalNotAttempted,
+        },
+        null,
+        2
+      ) + "\n"
+    );
+    process.exit(2);
+  }
 
   // Phase 1: Batch text enrichment
   process.stderr.write(`\n=== Phase 1: Text enrichment (${notes.length} cards) ===\n`);
@@ -96,8 +162,17 @@ async function main() {
     process.exit(2);
   }
 
-  // Save text results + update note objects with new sentences
-  for (const item of batchResult.results) {
+  // Save text results and retain per-request occurrence identity. Duplicate
+  // note IDs are valid requested items and must not collapse into one result.
+  const textOutcomes = new Map();
+  for (let index = 0; index < notes.length; index++) {
+    const note = notes[index];
+    const item = batchResult.results[index] || {
+      noteId: note.noteId,
+      word: note.word,
+      error: "Text enrichment returned no result",
+    };
+    textOutcomes.set(note.requestIndex, item);
     if (item.error) {
       process.stderr.write(`  FAIL text: "${item.word}" — ${item.error}\n`);
       continue;
@@ -108,12 +183,16 @@ async function main() {
       process.stderr.write(`  OK text: "${item.word}"\n`);
 
       // Update the note's sentence for later phases
-      const noteObj = notes.find((n) => n.noteId === item.noteId);
-      if (noteObj && item.sentence) {
-        noteObj.sentence = item.sentence;
+      if (item.sentence) {
+        note.sentence = item.sentence;
       }
     } catch (err) {
-      process.stderr.write(`  FAIL text save: "${item.word}" — ${err.message}\n`);
+      const message = err instanceof Error ? err.message : String(err);
+      textOutcomes.set(note.requestIndex, {
+        ...item,
+        error: `Text save failed: ${message}`,
+      });
+      process.stderr.write(`  FAIL text save: "${item.word}" — ${message}\n`);
     }
   }
 
@@ -144,6 +223,14 @@ async function main() {
 
   // Phase 3: Image generation (per-note, requires sentence)
   const imageNotes = notes.filter((n) => n.sentence);
+  const imageOutcomes = new Map(
+    notes
+      .filter((n) => !n.sentence)
+      .map((n) => [
+        n.requestIndex,
+        { status: "not_attempted", reason: "no sentence" },
+      ])
+  );
   process.stderr.write(`\n=== Phase 3: Image generation (${imageNotes.length} cards with sentences) ===\n`);
   for (const note of imageNotes) {
     try {
@@ -159,10 +246,16 @@ async function main() {
       }
 
       const ankiFields = await mapEnrichResultToAnkiFields(note.noteId, note.word, enrichResult);
+      if (!ankiFields["Picture"]) {
+        throw new Error("Image generation returned no finalized Picture");
+      }
       await saveToAnki(note.noteId, ankiFields);
+      imageOutcomes.set(note.requestIndex, { status: "succeeded" });
       process.stderr.write(`  OK image: "${note.word}"\n`);
     } catch (err) {
-      process.stderr.write(`  FAIL image: "${note.word}" — ${err.message}\n`);
+      const message = err instanceof Error ? err.message : String(err);
+      imageOutcomes.set(note.requestIndex, { status: "failed", error: message });
+      process.stderr.write(`  FAIL image: "${note.word}" — ${message}\n`);
     }
   }
 
@@ -187,20 +280,59 @@ async function main() {
   }
 
   // Summary
-  for (const note of notes) {
-    const batchItem = batchResult.results.find((r) => r.noteId === note.noteId);
-    if (batchItem?.error) {
-      results.push({ noteId: note.noteId, word: note.word, error: batchItem.error });
+  for (const note of requestedItems) {
+    if (note.unresolvedReason) {
+      results.push({
+        ...(note.noteId !== undefined ? { noteId: note.noteId } : {}),
+        ...(note.word ? { word: note.word } : {}),
+        status: "not_attempted",
+        reason: note.unresolvedReason,
+      });
+      totalNotAttempted++;
+      continue;
+    }
+
+    const batchItem = textOutcomes.get(note.requestIndex);
+    const imageOutcome = imageOutcomes.get(note.requestIndex);
+    const errors = [batchItem?.error, imageOutcome?.error].filter(Boolean);
+
+    if (errors.length > 0) {
+      results.push({
+        noteId: note.noteId,
+        word: note.word,
+        status: "failed",
+        error: errors.join("; "),
+      });
       totalFailed++;
+    } else if (imageOutcome?.status === "not_attempted") {
+      results.push({
+        noteId: note.noteId,
+        word: note.word,
+        status: "not_attempted",
+        reason: imageOutcome.reason,
+      });
+      totalNotAttempted++;
     } else {
-      results.push({ noteId: note.noteId, word: note.word, enriched: true });
+      results.push({
+        noteId: note.noteId,
+        word: note.word,
+        status: "succeeded",
+        enriched: true,
+      });
       totalSucceeded++;
     }
   }
 
-  const summary = { results, succeeded: totalSucceeded, failed: totalFailed };
+  const summary = {
+    results,
+    succeeded: totalSucceeded,
+    failed: totalFailed,
+    notAttempted: totalNotAttempted,
+  };
   process.stdout.write(JSON.stringify(summary, null, 2) + "\n");
-  process.exit(totalFailed === notes.length ? 2 : totalFailed > 0 ? 1 : 0);
+  process.exit(
+    totalSucceeded === results.length ? 0 : totalSucceeded > 0 ? 1 : 2
+  );
 }
 
 main().catch((err) => {

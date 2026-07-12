@@ -43,15 +43,44 @@ export async function mapEnrichResultToAnkiFields(noteId, word, result) {
   // Store image media
   if (result.image && typeof result.image === "object") {
     const img = result.image;
-    const ext = img.mimeType?.includes("png") ? "png" : "jpg";
-    const safeWord = word.replace(/\s+/g, "_");
-    const filename = `spelling_${safeWord}_${noteId}.${ext}`;
-    try {
-      await post("/api/anki/media", { filename, data: img.base64 });
-      fields["Picture"] = `<img src="${filename}">`;
-    } catch (err) {
-      process.stderr.write(`  Warning: failed to save image for "${word}": ${err.message}\n`);
+    const imageBase64 =
+      typeof img.base64 === "string" ? img.base64.trim() : "";
+    const canonicalBase64 =
+      imageBase64.length % 4 === 0 &&
+      /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(
+        imageBase64
+      );
+    const imageBytes = Buffer.from(imageBase64, "base64");
+    const pngSignature = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+    const hasIhdr =
+      imageBytes.length >= 33 &&
+      imageBytes.readUInt32BE(8) === 13 &&
+      imageBytes.subarray(12, 16).toString("ascii") === "IHDR";
+    if (
+      !imageBase64 ||
+      !canonicalBase64 ||
+      img.mimeType !== "image/png" ||
+      imageBytes.length < pngSignature.length ||
+      !imageBytes.subarray(0, pngSignature.length).equals(pngSignature) ||
+      !hasIhdr
+    ) {
+      throw new Error(`Image for "${word}" is empty or not a valid PNG`);
     }
+
+    const safeWord = word.replace(/\s+/g, "_");
+    const filename = `spelling_${safeWord}_${noteId}.png`;
+    const mediaResult = await post("/api/anki/media", {
+      filename,
+      data: imageBase64,
+    });
+    const finalizedFilename = mediaResult?.filename;
+    if (
+      typeof finalizedFilename !== "string" ||
+      finalizedFilename.trim().length === 0
+    ) {
+      throw new Error(`Image media for "${word}" was not finalized`);
+    }
+    fields["Picture"] = `<img src="${finalizedFilename}">`;
   }
 
   // Store word audio

@@ -30,7 +30,7 @@ type ConfigKey =
   | "CLAUDE_CODE_OAUTH_TOKEN"
   | "AZURE_TTS_KEY"
   | "AZURE_TTS_REGION"
-  | "NANO_BANANA_API_KEY"
+  | "OPENAI_API_KEY"
   | "ANKI_CONNECT_URL"
   | "AI_BACKEND"
   | "TELEGRAM_BOT_TOKEN"
@@ -52,7 +52,7 @@ const SECTIONS = {
       "ANTHROPIC_API_KEY",
       "CLAUDE_CODE_OAUTH_TOKEN",
       "AZURE_TTS_KEY",
-      "NANO_BANANA_API_KEY",
+      "OPENAI_API_KEY",
     ] as ConfigKey[],
   },
   configuration: {
@@ -72,7 +72,7 @@ const KEY_LABELS: Record<ConfigKey, string> = {
   CLAUDE_CODE_OAUTH_TOKEN: "Claude OAuth Token",
   AZURE_TTS_KEY: "Azure TTS Key",
   AZURE_TTS_REGION: "Azure TTS Region",
-  NANO_BANANA_API_KEY: "Gemini API Key",
+  OPENAI_API_KEY: "OpenAI API Key",
   ANKI_CONNECT_URL: "AnkiConnect URL",
   AI_BACKEND: "Backend Mode",
   TELEGRAM_BOT_TOKEN: "Bot Token",
@@ -86,7 +86,7 @@ const KEY_PLACEHOLDERS: Partial<Record<ConfigKey, string>> = {
   CLAUDE_CODE_OAUTH_TOKEN: "Paste token from claude setup-token",
   AZURE_TTS_KEY: "Azure subscription key",
   AZURE_TTS_REGION: "australiaeast",
-  NANO_BANANA_API_KEY: "AIza...",
+  OPENAI_API_KEY: "sk-project-...",
   ANKI_CONNECT_URL: "http://localhost:8765",
   TELEGRAM_BOT_TOKEN: "123456:ABC-DEF...",
   TELEGRAM_ALLOWED_USERS: "123456789, 987654321",

@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAllConfigStatus, saveSettings, getAIBackend, type ConfigKey } from "@/lib/settings";
+import {
+  getAllConfigStatus,
+  saveSettings,
+  getAIBackend,
+  isConfigKey,
+  type ConfigKey,
+} from "@/lib/settings";
 
 export async function GET() {
   try {
@@ -18,11 +24,35 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const updates = body.settings as Partial<Record<ConfigKey, string>>;
+    const rawUpdates =
+      body && typeof body === "object"
+        ? (body as { settings?: unknown }).settings
+        : undefined;
 
-    if (!updates || typeof updates !== "object") {
+    if (
+      !rawUpdates ||
+      typeof rawUpdates !== "object" ||
+      Array.isArray(rawUpdates)
+    ) {
       return NextResponse.json({ error: "settings object is required" }, { status: 400 });
     }
+
+    for (const [key, value] of Object.entries(rawUpdates)) {
+      if (!isConfigKey(key)) {
+        return NextResponse.json(
+          { error: `Unknown setting: ${key}` },
+          { status: 400 }
+        );
+      }
+      if (typeof value !== "string") {
+        return NextResponse.json(
+          { error: `Setting ${key} must be a string` },
+          { status: 400 }
+        );
+      }
+    }
+
+    const updates = rawUpdates as Partial<Record<ConfigKey, string>>;
 
     saveSettings(updates);
 

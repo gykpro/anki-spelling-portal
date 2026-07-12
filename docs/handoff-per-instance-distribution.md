@@ -24,9 +24,16 @@ npm install          # Node 23.x / npm 11.x（开发机上验证过的版本）
 ```
 
 **没有跟随分支走的本地文件**（新机器需自行准备，不在 git 里）：
-- `data/secrets.json` — 所有密钥与配置（`ANTHROPIC_API_KEY` 或 `CLAUDE_CODE_OAUTH_TOKEN`、`AZURE_TTS_KEY`、`NANO_BANANA_API_KEY`、`TELEGRAM_BOT_TOKEN`、`ANKI_CONNECT_URL`、`DISTRIBUTION_TARGETS`）。通过门户设置页填，或手工创建。**切勿把生产 Telegram token 填到开发机**（会和 VPS bot 抢 long-polling）。
+- `data/secrets.json` — 所有密钥与配置（`ANTHROPIC_API_KEY` 或 `CLAUDE_CODE_OAUTH_TOKEN`、`AZURE_TTS_KEY`、`OPENAI_API_KEY`、`TELEGRAM_BOT_TOKEN`、`ANKI_CONNECT_URL`、`DISTRIBUTION_TARGETS`）。通过门户设置页填，或手工创建；`OPENAI_API_KEY` 是该环境唯一的 OpenAI 共用密钥，不另建图片专用密钥或第二密钥文件。图片生成固定使用 OpenAI Image API 的 `gpt-image-2`，不从环境变量读取密钥，也不改动现有 Azure TTS。**切勿把生产 Telegram token 填到开发机**（会和 VPS bot 抢 long-polling）。
 - `.claude/settings.local.json` — 本地 Claude Code 权限白名单，机器相关，无需迁移。
 - `~/services/anki/` — 测试用的 Podman 容器（见第 4 节）。
+
+图片生成还要求门户容器可出站访问 `api.openai.com:443`。更换密钥或升级
+图片生成代码后重启门户；真实付费 smoke 必须与自动测试分开，在私有环境只跑
+最小单图请求，密钥和生成产物都不得进入聊天、日志归档或 git。
+每次图片请求最多等待 120 秒，仅瞬态失败可再试一次。写入 Picture 时必须使用
+Anki 返回的最终文件名；Save All 中图片生成或媒体落盘失败的项目保持未保存，
+也不得进入分发。
 
 ## 3. 本分支已完成的工作（12 个提交）
 

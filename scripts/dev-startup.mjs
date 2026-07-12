@@ -109,15 +109,15 @@ async function main() {
   }
   console.log(`  ${bold("Azure TTS:")}     ${azureLine}`);
 
-  // Gemini / Nano Banana
-  const geminiKey = getVal("NANO_BANANA_API_KEY", secrets);
-  let geminiLine;
-  if (geminiKey.value) {
-    geminiLine = green("Configured");
+  // OpenAI image generation
+  const openaiKey = getVal("OPENAI_API_KEY", secrets);
+  let openaiLine;
+  if (openaiKey.value) {
+    openaiLine = green("Configured");
   } else {
-    geminiLine = yellow("Not set") + dim(" — image generation unavailable");
+    openaiLine = yellow("Not set") + dim(" — image generation unavailable");
   }
-  console.log(`  ${bold("Gemini:")}        ${geminiLine}`);
+  console.log(`  ${bold("OpenAI Images:")} ${openaiLine}`);
 
   // AnkiConnect URL (only key that supports env var — for Docker)
   const ankiUrl = getVal("ANKI_CONNECT_URL", secrets);
